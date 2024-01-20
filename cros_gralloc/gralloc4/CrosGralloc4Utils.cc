@@ -62,7 +62,8 @@ int convertToCrosDescriptor(const BufferDescriptorInfo& descriptor,
     outCrosDescriptor->height = descriptor.height;
     outCrosDescriptor->droid_format = static_cast<int32_t>(descriptor.format);
     outCrosDescriptor->droid_usage = descriptor.usage;
-    outCrosDescriptor->reserved_region_size = descriptor.reservedSize;
+    outCrosDescriptor->enable_metadata_fd = true;
+    outCrosDescriptor->client_metadata_size = descriptor.reservedSize;
     if (descriptor.layerCount > 1) {
         ALOGE("Failed to convert descriptor. Unsupported layerCount: %d", descriptor.layerCount);
         return -EINVAL;

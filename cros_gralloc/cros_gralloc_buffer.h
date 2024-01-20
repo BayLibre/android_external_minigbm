@@ -19,6 +19,8 @@ class cros_gralloc_buffer
 
 	~cros_gralloc_buffer();
 
+	int32_t initialize_metadata(const struct cros_gralloc_buffer_descriptor *descriptor);
+
 	uint32_t get_id() const;
 	uint32_t get_width() const;
 	uint32_t get_pixel_stride() const;

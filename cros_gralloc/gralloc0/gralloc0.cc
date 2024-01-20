@@ -81,7 +81,7 @@ static int gralloc0_alloc(alloc_device_t *dev, int w, int h, int format, int usa
 	descriptor.droid_usage = usage;
 	descriptor.drm_format = cros_gralloc_convert_format(format);
 	descriptor.use_flags = cros_gralloc_convert_usage(usage);
-	descriptor.reserved_region_size = 0;
+	descriptor.enable_metadata_fd = false;
 
 	if (!mod->driver->is_supported(&descriptor)) {
 		ALOGE("Unsupported combination -- HAL format: %u, HAL usage: %u, "

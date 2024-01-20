@@ -11,6 +11,8 @@
 
 #include <cutils/native_handle.h>
 
+#include "cros_gralloc_buffer_metadata.h"
+
 /*static*/
 std::unique_ptr<cros_gralloc_buffer>
 cros_gralloc_buffer::create(struct bo *acquire_bo,
@@ -33,6 +35,32 @@ cros_gralloc_buffer::create(struct bo *acquire_bo,
 	}
 
 	return buffer;
+}
+
+int32_t
+cros_gralloc_buffer::initialize_metadata(const struct cros_gralloc_buffer_descriptor *descriptor)
+{
+	void *metadata_addr;
+	uint64_t metadata_region_size;
+	int32_t ret = get_reserved_region(&metadata_addr, &metadata_region_size);
+	if (ret) {
+		ALOGE("Failed to initialize metadata: failed to get reserved region.");
+		return ret;
+	}
+
+	if (metadata_addr == nullptr) {
+		ALOGE("Failed to initialize metadata: invalid metadata address.");
+		return -EINVAL;
+	}
+
+	cros_gralloc_buffer_metadata *metadata =
+	    reinterpret_cast<cros_gralloc_buffer_metadata *>(metadata_addr);
+
+	snprintf(metadata->name, CROS_GRALLOC_BUFFER_METADATA_MAX_NAME_SIZE, "%s",
+		 descriptor->name.c_str());
+	metadata->dataspace = descriptor->dataspace;
+	metadata->blendMode = descriptor->blend;
+	return 0;
 }
 
 cros_gralloc_buffer::cros_gralloc_buffer(struct bo *acquire_bo,

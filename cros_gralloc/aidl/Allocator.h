@@ -13,7 +13,6 @@
 
 #include "cros_gralloc/cros_gralloc_driver.h"
 #include "cros_gralloc/cros_gralloc_helpers.h"
-#include "cros_gralloc/gralloc4/CrosGralloc4Metadata.h"
 
 namespace aidl::android::hardware::graphics::allocator::impl {
 
@@ -39,16 +38,12 @@ class Allocator : public BnAllocator {
 
   private:
     using Dataspace = aidl::android::hardware::graphics::common::Dataspace;
-    ndk::ScopedAStatus allocate(
-            const ::android::hardware::graphics::mapper::V4_0::IMapper::BufferDescriptorInfo&
-                    descriptor,
-            int32_t* outStride, native_handle_t** outHandle,
-            Dataspace initialDataspace = Dataspace::UNKNOWN);
 
-    ndk::ScopedAStatus initializeMetadata(
-            cros_gralloc_handle_t crosHandle,
-            const struct cros_gralloc_buffer_descriptor& crosDescriptor,
-            Dataspace initialDataspace);
+    ndk::ScopedAStatus allocate(const struct cros_gralloc_buffer_descriptor& descriptor,
+                                int32_t count, allocator::AllocationResult* outResult);
+
+    ndk::ScopedAStatus allocateBuffer(const struct cros_gralloc_buffer_descriptor& descriptor,
+                                      int32_t* outStride, native_handle_t** outHandle);
 
     void releaseBufferAndHandle(native_handle_t* handle);
 

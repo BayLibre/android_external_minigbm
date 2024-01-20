@@ -8,9 +8,9 @@
 
 #include <memory>
 
+#include "cros_gralloc/cros_gralloc_buffer_metadata.h"
 #include "cros_gralloc/cros_gralloc_driver.h"
 #include "cros_gralloc/cros_gralloc_handle.h"
-#include "cros_gralloc/gralloc4/CrosGralloc4Metadata.h"
 
 class CrosGralloc4Mapper : public android::hardware::graphics::mapper::V4_0::IMapper {
   public:
@@ -69,7 +69,7 @@ class CrosGralloc4Mapper : public android::hardware::graphics::mapper::V4_0::IMa
 
   private:
     enum class ReservedRegionArea {
-        /* CrosGralloc4Metadata */
+        /* struct cros_gralloc_buffer_metadata */
         MAPPER4_METADATA,
 
         /* External user metadata */
@@ -81,10 +81,11 @@ class CrosGralloc4Mapper : public android::hardware::graphics::mapper::V4_0::IMa
             uint64_t* outSize);
 
     android::hardware::graphics::mapper::V4_0::Error getMetadata(
-            const cros_gralloc_buffer* crosBuffer, const CrosGralloc4Metadata** outMetadata);
+            const cros_gralloc_buffer* crosBuffer,
+            const struct cros_gralloc_buffer_metadata** outMetadata);
 
     android::hardware::graphics::mapper::V4_0::Error getMutableMetadata(
-            cros_gralloc_buffer* crosBuffer, CrosGralloc4Metadata** outMetadata);
+            cros_gralloc_buffer* crosBuffer, struct cros_gralloc_buffer_metadata** outMetadata);
 
     android::hardware::Return<void> get(const cros_gralloc_buffer* crosBuffer,
                                         const MetadataType& metadataType, get_cb hidlCb);
