@@ -12,7 +12,7 @@
 #include <aidl/android/hardware/graphics/common/Dataspace.h>
 #include <aidl/android/hardware/graphics/common/Smpte2086.h>
 
-#define CROS_GRALLOC_BUFFER_METADATA_MAX_NAME_SIZE 1024
+#include "cros_gralloc_helpers.h"
 
 /*
  * The metadata for cros_gralloc_buffer-s that should reside in a shared memory region
@@ -28,7 +28,7 @@ struct cros_gralloc_buffer_metadata {
 	 * handles.
 	 */
 	char name[CROS_GRALLOC_BUFFER_METADATA_MAX_NAME_SIZE];
-	aidl::android::hardware::graphics::common::BlendMode blendMode;
+	aidl::android::hardware::graphics::common::BlendMode blend_mode;
 	aidl::android::hardware::graphics::common::Dataspace dataspace;
 	std::optional<aidl::android::hardware::graphics::common::Cta861_3> cta861_3;
 	std::optional<aidl::android::hardware::graphics::common::Smpte2086> smpte2086;

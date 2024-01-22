@@ -13,6 +13,11 @@
 
 #include "cros_gralloc_buffer_metadata.h"
 
+using aidl::android::hardware::graphics::common::BlendMode;
+using aidl::android::hardware::graphics::common::Cta861_3;
+using aidl::android::hardware::graphics::common::Dataspace;
+using aidl::android::hardware::graphics::common::Smpte2086;
+
 /*static*/
 std::unique_ptr<cros_gralloc_buffer>
 cros_gralloc_buffer::create(struct bo *acquire_bo,
@@ -40,26 +45,23 @@ cros_gralloc_buffer::create(struct bo *acquire_bo,
 int32_t
 cros_gralloc_buffer::initialize_metadata(const struct cros_gralloc_buffer_descriptor *descriptor)
 {
-	void *metadata_addr;
-	uint64_t metadata_region_size;
-	int32_t ret = get_reserved_region(&metadata_addr, &metadata_region_size);
+	struct cros_gralloc_buffer_metadata *metadata;
+
+	int ret = get_metadata(&metadata);
 	if (ret) {
-		ALOGE("Failed to initialize metadata: failed to get reserved region.");
+		ALOGE("Failed to initialize metadata: failed to get metadata region.");
 		return ret;
 	}
 
-	if (metadata_addr == nullptr) {
+	if (metadata == nullptr) {
 		ALOGE("Failed to initialize metadata: invalid metadata address.");
-		return -EINVAL;
+		return -1;
 	}
-
-	cros_gralloc_buffer_metadata *metadata =
-	    reinterpret_cast<cros_gralloc_buffer_metadata *>(metadata_addr);
 
 	snprintf(metadata->name, CROS_GRALLOC_BUFFER_METADATA_MAX_NAME_SIZE, "%s",
 		 descriptor->name.c_str());
 	metadata->dataspace = descriptor->dataspace;
-	metadata->blendMode = descriptor->blend;
+	metadata->blend_mode = descriptor->blend;
 	return 0;
 }
 
@@ -154,6 +156,132 @@ int32_t cros_gralloc_buffer::get_android_format() const
 int64_t cros_gralloc_buffer::get_android_usage() const
 {
 	return hnd_->usage;
+}
+
+int32_t cros_gralloc_buffer::get_name(std::optional<std::string> *name) const
+{
+	const struct cros_gralloc_buffer_metadata *metadata;
+
+	int ret = get_metadata(&metadata);
+	if (ret) {
+		ALOGE("Failed to get_name: failed to get metadata.");
+		return ret;
+	}
+
+	*name = metadata->name;
+	return 0;
+}
+
+int32_t cros_gralloc_buffer::get_blend_mode(std::optional<BlendMode> *blend_mode) const
+{
+	const struct cros_gralloc_buffer_metadata *metadata;
+
+	int ret = get_metadata(&metadata);
+	if (ret) {
+		ALOGE("Failed to get_blend_mode: failed to get metadata.");
+		return ret;
+	}
+
+	*blend_mode = metadata->blend_mode;
+	return 0;
+}
+
+int32_t cros_gralloc_buffer::set_blend_mode(BlendMode blend_mode)
+{
+	struct cros_gralloc_buffer_metadata *metadata;
+
+	int ret = get_metadata(&metadata);
+	if (ret) {
+		ALOGE("Failed to set_blend_mode: failed to get metadata.");
+		return ret;
+	}
+
+	metadata->blend_mode = blend_mode;
+	return 0;
+}
+
+int32_t cros_gralloc_buffer::get_dataspace(std::optional<Dataspace> *dataspace) const
+{
+	const struct cros_gralloc_buffer_metadata *metadata;
+
+	int ret = get_metadata(&metadata);
+	if (ret) {
+		ALOGE("Failed to get_dataspace: failed to get metadata.");
+		return ret;
+	}
+
+	*dataspace = metadata->dataspace;
+	return 0;
+}
+
+int32_t cros_gralloc_buffer::set_dataspace(Dataspace dataspace)
+{
+	struct cros_gralloc_buffer_metadata *metadata;
+
+	int ret = get_metadata(&metadata);
+	if (ret) {
+		ALOGE("Failed to set_dataspace: failed to get metadata.");
+		return ret;
+	}
+
+	metadata->dataspace = dataspace;
+	return 0;
+}
+
+int32_t cros_gralloc_buffer::get_cta861_3(std::optional<Cta861_3> *cta) const
+{
+	const struct cros_gralloc_buffer_metadata *metadata;
+
+	int ret = get_metadata(&metadata);
+	if (ret) {
+		ALOGE("Failed to get_cta861_3: failed to get metadata.");
+		return ret;
+	}
+
+	*cta = metadata->cta861_3;
+	return 0;
+}
+
+int32_t cros_gralloc_buffer::set_cta861_3(std::optional<Cta861_3> cta)
+{
+	struct cros_gralloc_buffer_metadata *metadata;
+
+	int ret = get_metadata(&metadata);
+	if (ret) {
+		ALOGE("Failed to set_cta861_3: failed to get metadata.");
+		return ret;
+	}
+
+	metadata->cta861_3 = cta;
+	return 0;
+}
+
+int32_t cros_gralloc_buffer::get_smpte2086(std::optional<Smpte2086> *smpte) const
+{
+	const struct cros_gralloc_buffer_metadata *metadata;
+
+	int ret = get_metadata(&metadata);
+	if (ret) {
+		ALOGE("Failed to get_smpte2086: failed to get metadata.");
+		return ret;
+	}
+
+	*smpte = metadata->smpte2086;
+	return 0;
+}
+
+int32_t cros_gralloc_buffer::set_smpte2086(std::optional<Smpte2086> smpte)
+{
+	struct cros_gralloc_buffer_metadata *metadata;
+
+	int ret = get_metadata(&metadata);
+	if (ret) {
+		ALOGE("Failed to set_cta861_3: failed to get metadata.");
+		return ret;
+	}
+
+	metadata->smpte2086 = smpte;
+	return 0;
 }
 
 int32_t cros_gralloc_buffer::increase_refcount()
@@ -276,5 +404,56 @@ int32_t cros_gralloc_buffer::get_reserved_region(void **addr, uint64_t *size) co
 
 	*addr = reserved_region_addr_;
 	*size = hnd_->reserved_region_size;
+	return 0;
+}
+
+int32_t cros_gralloc_buffer::get_client_reserved_region(void **client_reserved_region_addr,
+							uint64_t *client_reserved_region_size) const
+{
+	int32_t ret = get_reserved_region(client_reserved_region_addr, client_reserved_region_size);
+	if (ret) {
+		return ret;
+	}
+
+	*client_reserved_region_addr =
+	    reinterpret_cast<void *>(reinterpret_cast<char *>(*client_reserved_region_addr) +
+				     sizeof(struct cros_gralloc_buffer_metadata));
+	*client_reserved_region_size =
+	    *client_reserved_region_size - sizeof(struct cros_gralloc_buffer_metadata);
+	return 0;
+}
+
+int32_t cros_gralloc_buffer::get_metadata(struct cros_gralloc_buffer_metadata **metadata)
+{
+	void *metadata_addr;
+	uint64_t metadata_region_size;
+	int32_t ret = get_reserved_region(&metadata_addr, &metadata_region_size);
+	if (ret) {
+		return ret;
+	}
+
+	if (metadata_addr == nullptr) {
+		return -1;
+	}
+
+	*metadata = reinterpret_cast<struct cros_gralloc_buffer_metadata *>(metadata_addr);
+	return 0;
+}
+
+int32_t
+cros_gralloc_buffer::get_metadata(const struct cros_gralloc_buffer_metadata **metadata) const
+{
+	void *metadata_addr;
+	uint64_t metadata_region_size;
+	int32_t ret = get_reserved_region(&metadata_addr, &metadata_region_size);
+	if (ret) {
+		return ret;
+	}
+
+	if (metadata_addr == nullptr) {
+		return -1;
+	}
+
+	*metadata = reinterpret_cast<const struct cros_gralloc_buffer_metadata *>(metadata_addr);
 	return 0;
 }

@@ -9,7 +9,6 @@
 #include <android/hardware/graphics/mapper/4.0/IMapper.h>
 #include <gralloctypes/Gralloc4.h>
 
-#include "cros_gralloc/cros_gralloc_buffer_metadata.h"
 #include "cros_gralloc/cros_gralloc_helpers.h"
 #include "cros_gralloc/gralloc4/CrosGralloc4Utils.h"
 

@@ -29,6 +29,8 @@
 #define BUFFER_USAGE_FRONT_RENDERING_MASK                                                          \
 	(BUFFER_USAGE_FRONT_RENDERING | BUFFER_USAGE_FRONT_RENDERING_PRIVATE)
 
+#define CROS_GRALLOC_BUFFER_METADATA_MAX_NAME_SIZE 1024
+
 struct cros_gralloc_buffer_descriptor {
 	uint32_t width;
 	uint32_t height;

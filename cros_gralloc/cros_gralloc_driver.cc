@@ -583,27 +583,6 @@ int32_t cros_gralloc_driver::resource_info(buffer_handle_t handle, uint32_t stri
 	return buffer->resource_info(strides, offsets, format_modifier);
 }
 
-int32_t cros_gralloc_driver::get_reserved_region(buffer_handle_t handle,
-						 void **reserved_region_addr,
-						 uint64_t *reserved_region_size)
-{
-	std::lock_guard<std::mutex> lock(mutex_);
-
-	auto hnd = cros_gralloc_convert_handle(handle);
-	if (!hnd) {
-		ALOGE("Invalid handle.");
-		return -EINVAL;
-	}
-
-	auto buffer = get_buffer(hnd);
-	if (!buffer) {
-		ALOGE("Invalid reference (get_reserved_region() called on unregistered handle).");
-		return -EINVAL;
-	}
-
-	return buffer->get_reserved_region(reserved_region_addr, reserved_region_size);
-}
-
 uint32_t cros_gralloc_driver::get_resolved_drm_format(uint32_t drm_format, uint64_t use_flags)
 {
 	uint32_t resolved_format;

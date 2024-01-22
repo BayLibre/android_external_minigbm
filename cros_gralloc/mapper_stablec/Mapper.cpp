@@ -118,30 +118,12 @@ class CrosGrallocMapperV5 final : public vendor::mapper::IMapperV5Impl {
                                      uint64_t* _Nonnull outReservedSize) override;
 
   private:
-    enum class ReservedRegionArea {
-        /* struct cros_gralloc_buffer_metadata */
-        MAPPER4_METADATA,
-
-        /* External user metadata */
-        USER_METADATA,
-    };
-
-    AIMapper_Error getReservedRegionArea(const cros_gralloc_buffer* crosBuffer,
-                                         ReservedRegionArea area, void** outAddr,
-                                         uint64_t* outSize);
-
-    AIMapper_Error getCrosMetadata(const cros_gralloc_buffer* crosBuffer,
-                                   const struct cros_gralloc_buffer_metadata** outMetadata);
-
-    AIMapper_Error getMutableCrosMetadata(cros_gralloc_buffer* crosBuffer,
-                                          struct cros_gralloc_buffer_metadata** outMetadata);
-
     template <typename F, StandardMetadataType TYPE>
     int32_t getStandardMetadata(const cros_gralloc_buffer* crosBuffer, F&& provide,
                                 StandardMetadata<TYPE>);
 
     template <StandardMetadataType TYPE>
-    AIMapper_Error setStandardMetadata(struct cros_gralloc_buffer_metadata* crosMetadata,
+    AIMapper_Error setStandardMetadata(cros_gralloc_buffer* crosBuffer,
                                        typename StandardMetadata<TYPE>::value_type&& value);
 
     void dumpBuffer(
@@ -394,23 +376,16 @@ int32_t CrosGrallocMapperV5::getStandardMetadata(buffer_handle_t _Nonnull buffer
 template <typename F, StandardMetadataType metadataType>
 int32_t CrosGrallocMapperV5::getStandardMetadata(const cros_gralloc_buffer* crosBuffer, F&& provide,
                                                  StandardMetadata<metadataType>) {
-    const struct cros_gralloc_buffer_metadata* crosMetadata = nullptr;
-    if constexpr (metadataType == StandardMetadataType::BLEND_MODE ||
-                  metadataType == StandardMetadataType::CTA861_3 ||
-                  metadataType == StandardMetadataType::DATASPACE ||
-                  metadataType == StandardMetadataType::NAME ||
-                  metadataType == StandardMetadataType::SMPTE2086) {
-        AIMapper_Error error = getCrosMetadata(crosBuffer, &crosMetadata);
-        if (error != AIMAPPER_ERROR_NONE) {
-            ALOGE("Failed to get. Failed to get buffer metadata.");
-            return -AIMAPPER_ERROR_NO_RESOURCES;
-        }
-    }
     if constexpr (metadataType == StandardMetadataType::BUFFER_ID) {
         return provide(crosBuffer->get_id());
     }
     if constexpr (metadataType == StandardMetadataType::NAME) {
-        return provide(crosMetadata->name);
+        std::optional<std::string> name;
+        if (crosBuffer->get_name(&name)) {
+            return -AIMAPPER_ERROR_NO_RESOURCES;
+        } else {
+            return provide(*name);
+        }
     }
     if constexpr (metadataType == StandardMetadataType::WIDTH) {
         return provide(crosBuffer->get_width());
@@ -499,16 +474,36 @@ int32_t CrosGrallocMapperV5::getStandardMetadata(const cros_gralloc_buffer* cros
         return provide(crops);
     }
     if constexpr (metadataType == StandardMetadataType::DATASPACE) {
-        return provide(crosMetadata->dataspace);
+        std::optional<Dataspace> dataspace;
+        if (crosBuffer->get_dataspace(&dataspace)) {
+            return -AIMAPPER_ERROR_NO_RESOURCES;
+        } else {
+            return provide(*dataspace);
+        }
     }
     if constexpr (metadataType == StandardMetadataType::BLEND_MODE) {
-        return provide(crosMetadata->blendMode);
+        std::optional<BlendMode> blend;
+        if (crosBuffer->get_blend_mode(&blend)) {
+            return -AIMAPPER_ERROR_NO_RESOURCES;
+        } else {
+            return provide(*blend);
+        }
     }
     if constexpr (metadataType == StandardMetadataType::SMPTE2086) {
-        return crosMetadata->smpte2086 ? provide(*crosMetadata->smpte2086) : 0;
+        std::optional<Smpte2086> smpte;
+        if (crosBuffer->get_smpte2086(&smpte)) {
+            return -AIMAPPER_ERROR_NO_RESOURCES;
+        } else {
+            return smpte ? provide(*smpte) : 0;
+        }
     }
     if constexpr (metadataType == StandardMetadataType::CTA861_3) {
-        return crosMetadata->cta861_3 ? provide(*crosMetadata->cta861_3) : 0;
+        std::optional<Cta861_3> cta;
+        if (crosBuffer->get_cta861_3(&cta)) {
+            return -AIMAPPER_ERROR_NO_RESOURCES;
+        } else {
+            return cta ? provide(*cta) : 0;
+        }
     }
     return -AIMAPPER_ERROR_UNSUPPORTED;
 }
@@ -564,14 +559,8 @@ AIMapper_Error CrosGrallocMapperV5::setStandardMetadata(buffer_handle_t _Nonnull
 
     AIMapper_Error status = AIMAPPER_ERROR_UNSUPPORTED;
     mDriver->with_buffer(crosHandle, [&](cros_gralloc_buffer* crosBuffer) {
-        struct cros_gralloc_buffer_metadata* crosMetadata = nullptr;
-        status = getMutableCrosMetadata(crosBuffer, &crosMetadata);
-        if (status != AIMAPPER_ERROR_NONE) {
-            return;
-        }
-
         auto applier = [&]<StandardMetadataType T>(auto&& value) -> AIMapper_Error {
-            return setStandardMetadata<T>(crosMetadata, std::forward<decltype(value)>(value));
+            return setStandardMetadata<T>(crosBuffer, std::forward<decltype(value)>(value));
         };
 
         status = applyStandardMetadata(standardType, metadata, metadataSize, applier);
@@ -581,19 +570,25 @@ AIMapper_Error CrosGrallocMapperV5::setStandardMetadata(buffer_handle_t _Nonnull
 
 template <StandardMetadataType TYPE>
 AIMapper_Error CrosGrallocMapperV5::setStandardMetadata(
-        struct cros_gralloc_buffer_metadata* crosMetadata, typename StandardMetadata<TYPE>::value_type&& value) {
+        cros_gralloc_buffer* crosBuffer, typename StandardMetadata<TYPE>::value_type&& value) {
+    int ret = 0;
     if constexpr (TYPE == StandardMetadataType::BLEND_MODE) {
-        crosMetadata->blendMode = value;
+        ret = crosBuffer->set_blend_mode(value);
     }
     if constexpr (TYPE == StandardMetadataType::CTA861_3) {
-        crosMetadata->cta861_3 = value;
+        ret = crosBuffer->set_cta861_3(value);
     }
     if constexpr (TYPE == StandardMetadataType::DATASPACE) {
-        crosMetadata->dataspace = value;
+        ret = crosBuffer->set_dataspace(value);
     }
     if constexpr (TYPE == StandardMetadataType::SMPTE2086) {
-        crosMetadata->smpte2086 = value;
+        ret = crosBuffer->set_smpte2086(value);
     }
+
+    if (ret) {
+        return AIMAPPER_ERROR_NO_RESOURCES;
+    }
+
     // Unsupported metadatas were already filtered before we reached this point
     return AIMAPPER_ERROR_NONE;
 }
@@ -745,75 +740,20 @@ AIMapper_Error CrosGrallocMapperV5::getReservedRegion(buffer_handle_t _Nonnull b
     uint64_t reservedRegionSize = 0;
 
     AIMapper_Error error = AIMAPPER_ERROR_NONE;
-    mDriver->with_buffer(crosHandle, [&, this](cros_gralloc_buffer* crosBuffer) {
-        error = getReservedRegionArea(crosBuffer, ReservedRegionArea::USER_METADATA,
-                                      &reservedRegionAddr, &reservedRegionSize);
+    mDriver->with_buffer(crosHandle, [&](cros_gralloc_buffer* crosBuffer) {
+        int ret = crosBuffer->get_client_reserved_region(&reservedRegionAddr, &reservedRegionSize);
+        if (ret) {
+            reservedRegionAddr = nullptr;
+            reservedRegionSize = 0;
+            error = AIMAPPER_ERROR_NO_RESOURCES;
+        }
     });
 
     if (error != AIMAPPER_ERROR_NONE) {
-        ALOGE("Failed to getReservedRegion. Failed to getReservedRegionArea.");
+        ALOGE("Failed to getReservedRegion. Failed to getReservedRegion.");
         return AIMAPPER_ERROR_BAD_BUFFER;
     }
 
-    return AIMAPPER_ERROR_NONE;
-}
-
-AIMapper_Error CrosGrallocMapperV5::getReservedRegionArea(const cros_gralloc_buffer* crosBuffer,
-                                                          ReservedRegionArea area, void** outAddr,
-                                                          uint64_t* outSize) {
-    int ret = crosBuffer->get_reserved_region(outAddr, outSize);
-    if (ret) {
-        ALOGE("Failed to getReservedRegionArea.");
-        *outAddr = nullptr;
-        *outSize = 0;
-        return AIMAPPER_ERROR_NO_RESOURCES;
-    }
-
-    switch (area) {
-        case ReservedRegionArea::MAPPER4_METADATA: {
-            // struct cros_gralloc_buffer_metadata resides at the beginning reserved region.
-            *outSize = sizeof(struct cros_gralloc_buffer_metadata);
-            break;
-        }
-        case ReservedRegionArea::USER_METADATA: {
-            // User metadata resides after the struct cros_gralloc_buffer_metadata.
-            *outAddr = reinterpret_cast<void*>(reinterpret_cast<char*>(*outAddr) +
-                                               sizeof(struct cros_gralloc_buffer_metadata));
-            *outSize = *outSize - sizeof(struct cros_gralloc_buffer_metadata);
-            break;
-        }
-    }
-
-    return AIMAPPER_ERROR_NONE;
-}
-
-AIMapper_Error CrosGrallocMapperV5::getCrosMetadata(const cros_gralloc_buffer* crosBuffer,
-                                                    const struct cros_gralloc_buffer_metadata** outMetadata) {
-    void* addr = nullptr;
-    uint64_t size;
-
-    auto error =
-            getReservedRegionArea(crosBuffer, ReservedRegionArea::MAPPER4_METADATA, &addr, &size);
-    if (error != AIMAPPER_ERROR_NONE) {
-        return error;
-    }
-
-    *outMetadata = reinterpret_cast<const struct cros_gralloc_buffer_metadata*>(addr);
-    return AIMAPPER_ERROR_NONE;
-}
-
-AIMapper_Error CrosGrallocMapperV5::getMutableCrosMetadata(cros_gralloc_buffer* crosBuffer,
-                                                           struct cros_gralloc_buffer_metadata** outMetadata) {
-    void* addr = nullptr;
-    uint64_t size;
-
-    auto error =
-            getReservedRegionArea(crosBuffer, ReservedRegionArea::MAPPER4_METADATA, &addr, &size);
-    if (error != AIMAPPER_ERROR_NONE) {
-        return error;
-    }
-
-    *outMetadata = reinterpret_cast<struct cros_gralloc_buffer_metadata*>(addr);
     return AIMAPPER_ERROR_NONE;
 }
 

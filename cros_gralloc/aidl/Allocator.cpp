@@ -13,7 +13,6 @@
 #include <gralloctypes/Gralloc4.h>
 #include <log/log.h>
 
-#include "cros_gralloc/cros_gralloc_buffer_metadata.h"
 #include "cros_gralloc/gralloc4/CrosGralloc4Utils.h"
 
 using aidl::android::hardware::common::NativeHandle;

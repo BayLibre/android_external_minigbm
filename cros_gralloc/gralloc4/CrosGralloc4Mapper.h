@@ -8,7 +8,6 @@
 
 #include <memory>
 
-#include "cros_gralloc/cros_gralloc_buffer_metadata.h"
 #include "cros_gralloc/cros_gralloc_driver.h"
 #include "cros_gralloc/cros_gralloc_handle.h"
 
@@ -68,25 +67,6 @@ class CrosGralloc4Mapper : public android::hardware::graphics::mapper::V4_0::IMa
                                                       getReservedRegion_cb hidlCb) override;
 
   private:
-    enum class ReservedRegionArea {
-        /* struct cros_gralloc_buffer_metadata */
-        MAPPER4_METADATA,
-
-        /* External user metadata */
-        USER_METADATA,
-    };
-
-    android::hardware::graphics::mapper::V4_0::Error getReservedRegionArea(
-            const cros_gralloc_buffer* crosBuffer, ReservedRegionArea area, void** outAddr,
-            uint64_t* outSize);
-
-    android::hardware::graphics::mapper::V4_0::Error getMetadata(
-            const cros_gralloc_buffer* crosBuffer,
-            const struct cros_gralloc_buffer_metadata** outMetadata);
-
-    android::hardware::graphics::mapper::V4_0::Error getMutableMetadata(
-            cros_gralloc_buffer* crosBuffer, struct cros_gralloc_buffer_metadata** outMetadata);
-
     android::hardware::Return<void> get(const cros_gralloc_buffer* crosBuffer,
                                         const MetadataType& metadataType, get_cb hidlCb);
 

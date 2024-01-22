@@ -44,9 +44,6 @@ class cros_gralloc_driver
 	int32_t resource_info(buffer_handle_t handle, uint32_t strides[DRV_MAX_PLANES],
 			      uint32_t offsets[DRV_MAX_PLANES], uint64_t *format_modifier);
 
-	int32_t get_reserved_region(buffer_handle_t handle, void **reserved_region_addr,
-				    uint64_t *reserved_region_size);
-
 	uint32_t get_resolved_drm_format(uint32_t drm_format, uint64_t use_flags);
 
 	void with_buffer(cros_gralloc_handle_t hnd,
