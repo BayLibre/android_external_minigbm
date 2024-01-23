@@ -58,6 +58,8 @@ cros_gralloc_buffer::initialize_metadata(const struct cros_gralloc_buffer_descri
 		return -1;
 	}
 
+	new (metadata) cros_gralloc_buffer_metadata();
+
 	snprintf(metadata->name, CROS_GRALLOC_BUFFER_METADATA_MAX_NAME_SIZE, "%s",
 		 descriptor->name.c_str());
 	metadata->dataspace = descriptor->dataspace;
@@ -238,7 +240,7 @@ int32_t cros_gralloc_buffer::get_cta861_3(std::optional<Cta861_3> *cta) const
 		return ret;
 	}
 
-	*cta = metadata->cta861_3;
+	*cta = metadata->cta861_3.to_std_optional();
 	return 0;
 }
 
@@ -266,7 +268,7 @@ int32_t cros_gralloc_buffer::get_smpte2086(std::optional<Smpte2086> *smpte) cons
 		return ret;
 	}
 
-	*smpte = metadata->smpte2086;
+	*smpte = metadata->smpte2086.to_std_optional();
 	return 0;
 }
 
