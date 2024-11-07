@@ -321,7 +321,7 @@ COMMON_CFLAGS-clang := -fvisibility=hidden -ggdb \
 # addition to -fvisibility=hidden. (go/cros-symbol-slimming)
 # minigbm: Disable -Wunreachable-code to unbreak compilation.
 COMMON_CFLAGS := -Wall -Wunused -Wno-unused-parameter \
-  -Wbool-operation -Wstring-compare -Wxor-used-as-pow \
+  -Wbool-operation -Wstring-compare $(call check_cc,-Wxor-used-as-pow) \
   -Wint-in-bool-context -Wfree-nonheap-object \
   -Werror -Wformat=2 -fno-strict-aliasing  \
   $(SSP_CFLAGS) -O1
