@@ -851,6 +851,19 @@ static size_t amdgpu_num_planes_from_modifier(struct driver *drv, uint32_t forma
 	return dri_num_planes_from_modifier(priv->dri, format, modifier);
 }
 
+static void amdgpu_resolve_format_and_use_flags(struct driver *drv, uint32_t format,
+						  uint64_t use_flags, uint32_t *out_format,
+						  uint64_t *out_use_flags) {
+	drv_resolve_format_and_use_flags_helper(drv, format, use_flags, out_format, out_use_flags);
+
+	// TODO(b/404428779): BO_USE_CURSOR should not be set with formats that don't support it.
+	// Remove this check once it is safe to do so.
+	if ((*out_use_flags & BO_USE_CURSOR) && !drv_get_combination(drv, out_format, out_use_flags)) {
+		drv_logi("Ignoring BO_USE_CURSOR flag with unsupported format %u\n", *out_format);
+		*out_use_flags &= ~BO_USE_CURSOR;
+	}
+}
+
 const struct backend backend_amdgpu = {
 	.name = "amdgpu",
 	.preload = amdgpu_preload,
@@ -864,7 +877,7 @@ const struct backend backend_amdgpu = {
 	.bo_map = amdgpu_map_bo,
 	.bo_unmap = amdgpu_unmap_bo,
 	.bo_invalidate = amdgpu_bo_invalidate,
-	.resolve_format_and_use_flags = drv_resolve_format_and_use_flags_helper,
+	.resolve_format_and_use_flags = amdgpu_resolve_format_and_use_flags,
 	.num_planes_from_modifier = amdgpu_num_planes_from_modifier,
 };
 
