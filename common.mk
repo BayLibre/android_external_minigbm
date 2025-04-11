@@ -312,15 +312,13 @@ endif
 #  CXXFLAGS := $(filter-out badflag,$(CXXFLAGS)) # Filter out a value
 # The same goes for CFLAGS.
 COMMON_CFLAGS-gcc := -fvisibility=internal -ggdb3 -Wa,--noexecstack
-# minigbm: Disable -Wimplicit-fallthrough to unbreak compilation.
-COMMON_CFLAGS-clang := -fvisibility=hidden -ggdb \
+COMMON_CFLAGS-clang := -fvisibility=hidden -ggdb -Wimplicit-fallthrough \
   -Wstring-plus-int
 # When a class is exported through __attribute__((visibility("default"))), we
 # still want to eliminate symbols from inline class member functions to reduce
 # symbol resolution overhead. Therefore, pass -fvisibility-inlines-hidden in
 # addition to -fvisibility=hidden. (go/cros-symbol-slimming)
-# minigbm: Disable -Wunreachable-code to unbreak compilation.
-COMMON_CFLAGS := -Wall -Wunused -Wno-unused-parameter \
+COMMON_CFLAGS := -Wall -Wunused -Wno-unused-parameter -Wunreachable-code \
   -Wbool-operation -Wstring-compare $(call check_cc,-Wxor-used-as-pow) \
   -Wint-in-bool-context -Wfree-nonheap-object \
   -Werror -Wformat=2 -fno-strict-aliasing  \
