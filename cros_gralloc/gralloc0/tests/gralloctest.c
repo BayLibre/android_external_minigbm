@@ -22,7 +22,7 @@
 #include <sync/sync.h>
 #include <system/graphics.h>
 
-#define ALIGN(A, B) (((A) + (B) - 1) / (B) * (B))
+#define ALIGN(A, B) (((A) + (B)-1) / (B) * (B))
 #define ARRAY_SIZE(A) (sizeof(A) / sizeof(*(A)))
 
 #define CHECK(cond)                                                                                \

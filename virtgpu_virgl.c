@@ -52,10 +52,9 @@ static const uint32_t texture_source_formats[] = {
 	DRM_FORMAT_YVU420_ANDROID, DRM_FORMAT_ABGR2101010, DRM_FORMAT_ABGR16161616F
 };
 
-static const uint32_t depth_stencil_formats[] = {
-	DRM_FORMAT_DEPTH16, DRM_FORMAT_DEPTH24, DRM_FORMAT_DEPTH24_STENCIL8,
-	DRM_FORMAT_DEPTH32, DRM_FORMAT_DEPTH32_STENCIL8
-};
+static const uint32_t depth_stencil_formats[] = { DRM_FORMAT_DEPTH16, DRM_FORMAT_DEPTH24,
+						  DRM_FORMAT_DEPTH24_STENCIL8, DRM_FORMAT_DEPTH32,
+						  DRM_FORMAT_DEPTH32_STENCIL8 };
 
 extern struct virtgpu_param params[];
 

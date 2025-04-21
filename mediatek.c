@@ -205,8 +205,7 @@ static int mediatek_init(struct driver *drv)
 	 * Android also frequently requests YV12 formats for some camera implementations
 	 * (including the external provider implmenetation).
 	 */
-	drv_modify_combination(drv, DRM_FORMAT_YVU420_ANDROID, &metadata,
-			       BO_USE_CAMERA_WRITE);
+	drv_modify_combination(drv, DRM_FORMAT_YVU420_ANDROID, &metadata, BO_USE_CAMERA_WRITE);
 
 #ifdef MTK_MT8183
 	/* Only for MT8183 Camera subsystem */
@@ -369,7 +368,8 @@ static int mediatek_bo_create_with_modifiers(struct bo *bo, uint32_t width, uint
 	if (is_protected) {
 #if !defined(ANDROID) || (ANDROID_API_LEVEL >= 31 && defined(HAS_DMABUF_SYSTEM_HEAP))
 		int ret;
-		struct mediatek_private_drv_data *priv = (struct mediatek_private_drv_data *)bo->drv->priv;
+		struct mediatek_private_drv_data *priv =
+		    (struct mediatek_private_drv_data *)bo->drv->priv;
 		struct dma_heap_allocation_data heap_data = {
 			.len = bo->meta.total_size,
 			.fd_flags = O_RDWR | O_CLOEXEC,
@@ -391,7 +391,8 @@ static int mediatek_bo_create_with_modifiers(struct bo *bo, uint32_t width, uint
 		}
 
 		if (priv->dma_heap_fd < 0) {
-			priv->dma_heap_fd = open("/dev/dma_heap/restricted_mtk_cma", O_RDWR | O_CLOEXEC);
+			priv->dma_heap_fd =
+			    open("/dev/dma_heap/restricted_mtk_cma", O_RDWR | O_CLOEXEC);
 			if (priv->dma_heap_fd < 0) {
 				drv_loge("Failed opening secure CMA heap errno=%d\n", -errno);
 				return -errno;

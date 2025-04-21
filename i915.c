@@ -559,7 +559,7 @@ static size_t i915_num_planes_from_modifier(struct driver *drv, uint32_t format,
 				     32 - __builtin_clz(x))                                        \
 	     : 0)
 
-#define roundup_power_of_two(x) ((x) != 0 ? 1ULL << gbm_fls((x) - 1) : 0)
+#define roundup_power_of_two(x) ((x) != 0 ? 1ULL << gbm_fls((x)-1) : 0)
 
 static int i915_bo_compute_metadata(struct bo *bo, uint32_t width, uint32_t height, uint32_t format,
 				    uint64_t use_flags, const uint64_t *modifiers, uint32_t count)
@@ -590,7 +590,7 @@ static int i915_bo_compute_metadata(struct bo *bo, uint32_t width, uint32_t heig
 		uint64_t cursor_width = 0;
 		uint64_t cursor_height = 0;
 		bool err = drmGetCap(bo->drv->fd, DRM_CAP_CURSOR_WIDTH, &cursor_width) ||
-			      drmGetCap(bo->drv->fd, DRM_CAP_CURSOR_HEIGHT, &cursor_height);
+			   drmGetCap(bo->drv->fd, DRM_CAP_CURSOR_HEIGHT, &cursor_height);
 
 		if (!err && width <= cursor_width && height <= cursor_height) {
 			width = cursor_width;

@@ -852,13 +852,15 @@ static size_t amdgpu_num_planes_from_modifier(struct driver *drv, uint32_t forma
 }
 
 static void amdgpu_resolve_format_and_use_flags(struct driver *drv, uint32_t format,
-						  uint64_t use_flags, uint32_t *out_format,
-						  uint64_t *out_use_flags) {
+						uint64_t use_flags, uint32_t *out_format,
+						uint64_t *out_use_flags)
+{
 	drv_resolve_format_and_use_flags_helper(drv, format, use_flags, out_format, out_use_flags);
 
 	// TODO(b/404428779): BO_USE_CURSOR should not be set with formats that don't support it.
 	// Remove this check once it is safe to do so.
-	if ((*out_use_flags & BO_USE_CURSOR) && !drv_get_combination(drv, *out_format, *out_use_flags)) {
+	if ((*out_use_flags & BO_USE_CURSOR) &&
+	    !drv_get_combination(drv, *out_format, *out_use_flags)) {
 		drv_logi("Ignoring BO_USE_CURSOR flag with unsupported format %u\n", *out_format);
 		*out_use_flags &= ~BO_USE_CURSOR;
 	}

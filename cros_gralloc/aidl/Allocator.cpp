@@ -38,8 +38,7 @@ bool Allocator::init() {
 // TODO(natsu): deduplicate with CrosGralloc4Allocator after the T release.
 ndk::ScopedAStatus Allocator::initializeMetadata(
         cros_gralloc_handle_t crosHandle,
-        const struct cros_gralloc_buffer_descriptor& crosDescriptor,
-        Dataspace initialDataspace) {
+        const struct cros_gralloc_buffer_descriptor& crosDescriptor, Dataspace initialDataspace) {
     if (!mDriver) {
         ALOGE("Failed to initializeMetadata. Driver is uninitialized.\n");
         return ToBinderStatus(AllocationError::NO_RESOURCES);
@@ -158,19 +157,20 @@ ndk::ScopedAStatus Allocator::allocate(const BufferDescriptorInfoV4& descriptor,
 }
 
 static BufferDescriptorInfoV4 convertAidlToIMapperV4Descriptor(const BufferDescriptorInfo& info) {
-    return BufferDescriptorInfoV4 {
-        .name{reinterpret_cast<const char*>(info.name.data())},
-        .width = static_cast<uint32_t>(info.width),
-        .height = static_cast<uint32_t>(info.height),
-        .layerCount = static_cast<uint32_t>(info.layerCount),
-        .format = static_cast<::android::hardware::graphics::common::V1_2::PixelFormat>(info.format),
-        .usage = static_cast<uint64_t>(info.usage),
-        .reservedSize = 0,
+    return BufferDescriptorInfoV4{
+            .name{reinterpret_cast<const char*>(info.name.data())},
+            .width = static_cast<uint32_t>(info.width),
+            .height = static_cast<uint32_t>(info.height),
+            .layerCount = static_cast<uint32_t>(info.layerCount),
+            .format = static_cast<::android::hardware::graphics::common::V1_2::PixelFormat>(
+                    info.format),
+            .usage = static_cast<uint64_t>(info.usage),
+            .reservedSize = 0,
     };
 }
 
 ndk::ScopedAStatus Allocator::allocate2(const BufferDescriptorInfo& descriptor, int32_t count,
-                            allocator::AllocationResult* outResult) {
+                                        allocator::AllocationResult* outResult) {
     if (!mDriver) {
         ALOGE("Failed to allocate. Driver is uninitialized.\n");
         return ToBinderStatus(AllocationError::NO_RESOURCES);
@@ -191,8 +191,8 @@ ndk::ScopedAStatus Allocator::allocate2(const BufferDescriptorInfo& descriptor, 
     handles.resize(count, nullptr);
 
     for (int32_t i = 0; i < count; i++) {
-        ndk::ScopedAStatus status = allocate(descriptionV4, &outResult->stride, &handles[i],
-                                             initialDataspace);
+        ndk::ScopedAStatus status =
+                allocate(descriptionV4, &outResult->stride, &handles[i], initialDataspace);
         if (!status.isOk()) {
             for (int32_t j = 0; j < i; j++) {
                 releaseBufferAndHandle(handles[j]);
@@ -211,8 +211,7 @@ ndk::ScopedAStatus Allocator::allocate2(const BufferDescriptorInfo& descriptor, 
     return ndk::ScopedAStatus::ok();
 }
 
-ndk::ScopedAStatus Allocator::isSupported(const BufferDescriptorInfo& descriptor,
-                            bool* outResult) {
+ndk::ScopedAStatus Allocator::isSupported(const BufferDescriptorInfo& descriptor, bool* outResult) {
     if (!mDriver) {
         ALOGE("Failed to allocate. Driver is uninitialized.\n");
         return ToBinderStatus(AllocationError::NO_RESOURCES);

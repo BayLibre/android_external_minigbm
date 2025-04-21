@@ -7,25 +7,18 @@
 #define ARRAY_SIZE(A) (sizeof(A) / sizeof(*(A)))
 
 static const uint32_t scanout_render_formats[] = {
-	DRM_FORMAT_ABGR2101010,
-	DRM_FORMAT_ABGR8888,
-	DRM_FORMAT_ARGB2101010,
-	DRM_FORMAT_ARGB8888,
-	DRM_FORMAT_RGB565,
-	DRM_FORMAT_XBGR2101010,
-	DRM_FORMAT_XBGR8888,
-	DRM_FORMAT_XRGB2101010,
-	DRM_FORMAT_XRGB8888,
+	DRM_FORMAT_ABGR2101010, DRM_FORMAT_ABGR8888,	DRM_FORMAT_ARGB2101010,
+	DRM_FORMAT_ARGB8888,	DRM_FORMAT_RGB565,	DRM_FORMAT_XBGR2101010,
+	DRM_FORMAT_XBGR8888,	DRM_FORMAT_XRGB2101010, DRM_FORMAT_XRGB8888,
 };
 
-static const uint32_t render_formats[] = { DRM_FORMAT_ABGR16161616F, };
+static const uint32_t render_formats[] = {
+	DRM_FORMAT_ABGR16161616F,
+};
 
 static const uint32_t texture_only_formats[] = {
-	DRM_FORMAT_R8,
-	DRM_FORMAT_NV12,
-	DRM_FORMAT_P010,
-	DRM_FORMAT_YVU420,
-	DRM_FORMAT_YVU420_ANDROID,
+	DRM_FORMAT_R8,	   DRM_FORMAT_NV12,	      DRM_FORMAT_P010,
+	DRM_FORMAT_YVU420, DRM_FORMAT_YVU420_ANDROID,
 };
 
 static const uint32_t image_storage_formats[] = {
@@ -65,17 +58,23 @@ const uint16_t gen12_ids[] = {
 };
 
 const uint16_t adlp_ids[] = {
-	0x46A0, 0x46A1, 0x46A2, 0x46A3, 0x46A6, 0x46A8, 0x46AA, 0x462A, 0x4626, 0x4628,
-	0x46B0, 0x46B1, 0x46B2, 0x46B3, 0x46C0, 0x46C1, 0x46C2, 0x46C3, 0x46D0, 0x46D1,
-	0x46D2, 0x46D3, 0x46D4,
+	0x46A0, 0x46A1, 0x46A2, 0x46A3, 0x46A6, 0x46A8, 0x46AA, 0x462A,
+	0x4626, 0x4628, 0x46B0, 0x46B1, 0x46B2, 0x46B3, 0x46C0, 0x46C1,
+	0x46C2, 0x46C3, 0x46D0, 0x46D1, 0x46D2, 0x46D3, 0x46D4,
 };
 
 const uint16_t rplp_ids[] = {
 	0xA720, 0xA721, 0xA7A0, 0xA7A1, 0xA7A8, 0xA7A9, 0xA7AA, 0xA7AB, 0xA7AC, 0xA7AD,
 };
 
-const uint16_t mtl_ids[] = { 0x7D40, 0x7D60, 0x7D45, 0x7D55, 0x7DD5, };
+const uint16_t mtl_ids[] = {
+	0x7D40, 0x7D60, 0x7D45, 0x7D55, 0x7DD5,
+};
 
-const uint16_t lnl_ids[] = { 0x6420, 0x64A0, 0x64B0, };
+const uint16_t lnl_ids[] = {
+	0x6420,
+	0x64A0,
+	0x64B0,
+};
 
 const uint16_t ptl_ids[] = { 0xB080, 0xB081, 0xB082, 0xB083, 0xB08F, 0xB090, 0xB0A0, 0xB0B0 };
