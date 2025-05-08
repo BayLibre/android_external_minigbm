@@ -10,9 +10,6 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <inttypes.h>
-#if !defined(ANDROID) || (ANDROID_API_LEVEL >= 31 && defined(HAS_DMABUF_SYSTEM_HEAP))
-#include <linux/dma-heap.h>
-#endif
 #include <poll.h>
 #include <stdio.h>
 #include <string.h>
@@ -20,6 +17,9 @@
 #include <sys/mman.h>
 #include <unistd.h>
 #include <xf86drm.h>
+#if !defined(ANDROID) || (ANDROID_API_LEVEL >= 31 && defined(HAS_DMABUF_SYSTEM_HEAP))
+#include "external/dma-heap.h"
+#endif
 #include "external/mediatek_drm.h"
 // clang-format on
 
