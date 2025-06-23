@@ -419,6 +419,28 @@ static void virgl_add_combinations(struct driver *drv, const uint32_t *drm_forma
 static int virgl_2d_dumb_bo_create(struct bo *bo, uint32_t width, uint32_t height, uint32_t format,
 				   uint64_t use_flags)
 {
+	/*
+	 * For cursor buffer, add padding as needed to reach a known cursor-plane-supported
+	 * buffer size, as reported by the cursor capability properties.
+	 *
+	 * If the requested dimensions exceed either of the reported capabilities, or if the
+	 * capabilities couldn't be read, silently fallback by continuing without additional
+	 * padding. The buffer can still be used normally, and be committed to non-cursor
+	 * planes.
+	 */
+	if (bo->meta.use_flags & BO_USE_CURSOR) {
+		uint64_t cursor_width = 0;
+		uint64_t cursor_height = 0;
+		// These values are not properly set in virtio, and will return the default dimensions of 64x64.
+		bool err = drmGetCap(bo->drv->fd, DRM_CAP_CURSOR_WIDTH, &cursor_width) ||
+			   drmGetCap(bo->drv->fd, DRM_CAP_CURSOR_HEIGHT, &cursor_height);
+
+		if (!err && width <= cursor_width && height <= cursor_height) {
+			width = cursor_width;
+			height = cursor_height;
+		}
+	}
+
 	if (bo->meta.format != DRM_FORMAT_R8) {
 		width = ALIGN(width, MESA_LLVMPIPE_TILE_SIZE);
 		height = ALIGN(height, MESA_LLVMPIPE_TILE_SIZE);
