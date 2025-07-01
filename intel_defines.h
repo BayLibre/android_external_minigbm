@@ -44,6 +44,7 @@ static const uint64_t gen12_modifier_order[] = {
 static const uint64_t xe_lpdp_modifier_order[] = {
 	/* TODO(ryanneph): I915_FORMAT_MOD_4_TILED_MTL_RC_CCS, */
 	I915_FORMAT_MOD_4_TILED,
+	I915_FORMAT_MOD_4_TILED_LNL_CCS,
 	I915_FORMAT_MOD_X_TILED,
 	DRM_FORMAT_MOD_LINEAR,
 };
