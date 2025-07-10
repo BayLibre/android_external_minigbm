@@ -173,6 +173,15 @@ static int xe_add_combinations(struct driver *drv)
 	drv_modify_combination(drv, DRM_FORMAT_YVU420_ANDROID, &metadata_linear,
 			       BO_USE_CAMERA_WRITE);
 
+	/* Rendering on non HW renderable external formats is supported on formats that
+	 * can be resolved by VK_ANDROID_external_format_resolve.
+	 * Currently: NV12, P010, linear YV12
+	 */
+	for (unsigned i = 0; i < ARRAY_SIZE(external_resolve_formats); i++) {
+		drv_modify_combination(drv, external_resolve_formats[i], &metadata_linear,
+				       render);
+	}
+
 	/* Android CTS tests require this. */
 	drv_add_combination(drv, DRM_FORMAT_BGR888, &metadata_linear, BO_USE_SW_MASK);
 
@@ -202,10 +211,12 @@ static int xe_add_combinations(struct driver *drv)
 	drv_add_combinations(drv, scanout_render_formats, ARRAY_SIZE(scanout_render_formats),
 			     &metadata_x_tiled, scanout_and_render_not_linear);
 
-	const uint64_t nv12_usage =
-	    BO_USE_TEXTURE | BO_USE_HW_VIDEO_DECODER | BO_USE_SCANOUT | hw_protected;
+	/* Rendering can be supported via VK_ANDROID_external_format_resolve */
+	const uint64_t nv12_usage = BO_USE_TEXTURE | BO_USE_HW_VIDEO_DECODER | BO_USE_SCANOUT |
+				    hw_protected | render_not_linear;
 	const uint64_t p010_usage = BO_USE_TEXTURE | BO_USE_HW_VIDEO_DECODER | hw_protected |
-				    (xe->graphics_version >= 11 ? BO_USE_SCANOUT : 0);
+				    (xe->graphics_version >= 11 ? BO_USE_SCANOUT : 0) |
+				    render_not_linear;
 
 	if (xe->is_mtl_or_newer) {
 		struct format_metadata metadata_4_tiled = { .tiling = XE_TILING_4,
