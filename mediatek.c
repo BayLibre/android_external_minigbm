@@ -42,6 +42,7 @@
 #if defined(MTK_MT8183) || \
     defined(MTK_MT8186) || \
     defined(MTK_MT8188G) || \
+    defined(MTK_MT8189) || \
     defined(MTK_MT8192) || \
     defined(MTK_MT8195) || \
     defined(MTK_MT8196)
