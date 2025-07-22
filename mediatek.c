@@ -393,7 +393,7 @@ static int mediatek_bo_create_with_modifiers(struct bo *bo, uint32_t width, uint
 
 		if (priv->dma_heap_fd < 0) {
 			priv->dma_heap_fd =
-			    open("/dev/dma_heap/restricted_mtk_cma", O_RDWR | O_CLOEXEC);
+			    open("/dev/dma_heap/restricted_mtk_cma", O_RDONLY | O_CLOEXEC);
 			if (priv->dma_heap_fd < 0) {
 				drv_loge("Failed opening secure CMA heap errno=%d\n", -errno);
 				return -errno;
