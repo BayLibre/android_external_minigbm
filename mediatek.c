@@ -144,7 +144,7 @@ static int mediatek_init(struct driver *drv)
 	}
 
 #if defined(HAS_DMABUF_SYSTEM_HEAP)
-	priv->dma_heap_fd = open("/dev/dma_heap/restricted_mtk_cma", O_RDWR | O_CLOEXEC);
+	priv->dma_heap_fd = open("/dev/dma_heap/restricted_mtk_cma", O_RDONLY | O_CLOEXEC);
 	if (priv->dma_heap_fd < 0) {
 		drv_loge("Failed opening secure CMA heap errno=%d\n", -errno);
 		protected = 0;
