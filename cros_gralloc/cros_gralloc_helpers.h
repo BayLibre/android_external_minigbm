@@ -10,8 +10,10 @@
 #include "../drv.h"
 #include "cros_gralloc_handle.h"
 
+#ifndef HAS_NO_AIDL_METADATA
 #include <aidl/android/hardware/graphics/common/BlendMode.h>
 #include <aidl/android/hardware/graphics/common/Dataspace.h>
+#endif // HAS_NO_AIDL_METADATA
 #include <log/log.h>
 #include <system/graphics.h>
 #include <system/window.h>
@@ -44,10 +46,12 @@ struct cros_gralloc_buffer_descriptor {
 	// additional amount of space reserved for client use.
 	uint64_t client_metadata_size = 0;
 	std::string name;
+#ifndef HAS_NO_AIDL_METADATA
 	aidl::android::hardware::graphics::common::Dataspace dataspace =
 	    aidl::android::hardware::graphics::common::Dataspace::UNKNOWN;
 	aidl::android::hardware::graphics::common::BlendMode blend =
 	    aidl::android::hardware::graphics::common::BlendMode::INVALID;
+#endif // HAS_NO_AIDL_METADATA
 };
 
 constexpr uint32_t cros_gralloc_magic = 0xABCDDCBA;

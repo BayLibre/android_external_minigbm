@@ -40,6 +40,10 @@ const static IMapper::MetadataType kArmMetadataTypePlaneFds{
 const static IMapper::MetadataType kArmMetadataTypeFormatDataType{
         GRALLOC_ARM_METADATA_TYPE_NAME, static_cast<int64_t>(ArmMetadataType::FORMAT_DATA_TYPE)};
 
+#ifdef HAS_NO_AIDL_METADATA
+static_assert(false, "Must not define HAS_NO_AIDL_METADATA when gralloc4 is enabled");
+#endif
+
 Return<void> CrosGralloc4Mapper::createDescriptor(const BufferDescriptorInfo& description,
                                                   createDescriptor_cb hidlCb) {
     hidl_vec<uint8_t> descriptor;
