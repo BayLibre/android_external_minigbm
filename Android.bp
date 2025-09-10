@@ -173,7 +173,7 @@ cc_library {
     name: "libgbm",
     defaults: ["minigbm_defaults"],
     host_supported: true,
-    min_sdk_version: "34",
+    min_sdk_version: "apex_inherit",
 
     srcs: [
         ":minigbm_core_files",
@@ -227,6 +227,7 @@ rust_bindgen {
     host_supported: true,
     vendor_available: true,
     product_available: true,
+    min_sdk_version: "34",
     apex_available: [
         "//apex_available:anyapex",
         "//apex_available:platform",
