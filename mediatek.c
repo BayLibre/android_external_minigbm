@@ -143,13 +143,10 @@ static int mediatek_init(struct driver *drv)
 		return -errno;
 	}
 
-#if !defined(ANDROID) || (ANDROID_API_LEVEL >= 31 && defined(HAS_DMABUF_SYSTEM_HEAP))
+#if defined(HAS_DMABUF_SYSTEM_HEAP)
 	priv->dma_heap_fd = open("/dev/dma_heap/restricted_mtk_cma", O_RDONLY | O_CLOEXEC);
 	if (priv->dma_heap_fd < 0) {
-		if (errno == EACCES)
-			drv_loge("Failed opening secure CMA heap because of permission (possibly sandbox or sepolicy) problem.\n");
-		else
-			drv_logi("Failed opening secure CMA heap with error %s.\n", strerror(errno));
+		drv_loge("Failed opening secure CMA heap errno=%d\n", -errno);
 		protected = 0;
 	}
 #else
