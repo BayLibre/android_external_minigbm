@@ -143,19 +143,29 @@ static int mediatek_init(struct driver *drv)
 		return -errno;
 	}
 
-#if !defined(ANDROID) || (ANDROID_API_LEVEL >= 31 && defined(HAS_DMABUF_SYSTEM_HEAP))
 	priv->dma_heap_fd = open("/dev/dma_heap/restricted_mtk_cma", O_RDONLY | O_CLOEXEC);
+#if defined(ANDROID)
+	// On ChromeOS, `protected` is always set to BO_USE_PROTECTED. There is
+	// an issue with the sandbox that prevents opening the DMA heap CMA
+	// file for some processes. For processes that need to actually allocate
+	// buffers, the open() call succeeds.
+	// TODO(b:444480658) figure out why open() fails in Chrome sometimes.
+	// On Android this unsets `protected` when there is no DMA heap support
+	// or if the file does not exist.
+#if (ANDROID_API_LEVEL >= 31 && defined(HAS_DMABUF_SYSTEM_HEAP))
 	if (priv->dma_heap_fd < 0) {
 		if (errno == EACCES)
-			drv_loge("Failed opening secure CMA heap because of permission (possibly sandbox or sepolicy) problem.\n");
+			drv_loge("Failed opening secure CMA heap because of permission (possibly "
+				 "sandbox or sepolicy) problem.\n");
 		else
-			drv_logi("Failed opening secure CMA heap with error %s.\n", strerror(errno));
+			drv_logi("Failed opening secure CMA heap with error %s.\n",
+				 strerror(errno));
 		protected = 0;
 	}
 #else
-	priv->dma_heap_fd = -1;
 	protected = 0;
-#endif
+#endif // (ANDROID_API_LEVEL >= 31 && defined(HAS_DMABUF_SYSTEM_HEAP))
+#endif // defined(ANDROID)
 
 	drv->priv = priv;
 
