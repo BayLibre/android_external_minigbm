@@ -351,7 +351,10 @@ destroy_hnd:
 	native_handle_close(hnd);
 	native_handle_delete(hnd);
 
-	drv_bo_destroy(bo);
+	// cros_gralloc_buffer takes the bo ownership when cros_gralloc_buffer::create succeeds
+	if (!buffer)
+		drv_bo_destroy(bo);
+
 	return ret;
 }
 
