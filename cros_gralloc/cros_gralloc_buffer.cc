@@ -49,6 +49,7 @@ cros_gralloc_buffer::initialize_metadata(const struct cros_gralloc_buffer_descri
 {
 	struct cros_gralloc_buffer_metadata *metadata;
 
+	assert(descriptor->enable_metadata_fd);
 	int ret = get_metadata(&metadata);
 	if (ret) {
 		ALOGE("Failed to initialize metadata: failed to get metadata region.");
