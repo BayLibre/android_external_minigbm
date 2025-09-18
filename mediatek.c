@@ -72,6 +72,10 @@
 
 struct mediatek_private_drv_data {
 	int dma_heap_fd;
+
+	bool init_subdrv_once;
+	int subdrv_fd;
+	struct driver *subdrv;
 };
 
 struct mediatek_private_map_data {
@@ -143,6 +147,10 @@ static int mediatek_init(struct driver *drv)
 	}
 
 	priv->dma_heap_fd = -1;
+
+	priv->init_subdrv_once = true;
+	priv->subdrv_fd = -1;
+
 	drv->priv = priv;
 
 	drv_add_combinations(drv, render_target_formats, ARRAY_SIZE(render_target_formats),
@@ -250,8 +258,54 @@ static void mediatek_close(struct driver *drv)
 	if (priv->dma_heap_fd >= 0)
 		close(priv->dma_heap_fd);
 
+	if (priv->subdrv) {
+		drv_destroy(priv->subdrv);
+		close(priv->subdrv_fd);
+	}
+
 	free(priv);
 	drv->priv = NULL;
+}
+
+static bool bo_forward_to_subdrv(struct bo *bo)
+{
+	struct mediatek_private_drv_data *priv = bo->drv->priv;
+
+	/* drm_mediatek allocates from 32-bit dma address space. When there is
+	 * no known HW usage, we can allocate from the sub-driver to
+	 * circumvent the limit.
+	 */
+	if (bo->meta.use_flags & BO_USE_HW_MASK)
+		return false;
+
+	/* Limit the forward to blobs for now. */
+	const bool is_format_blob =
+	    bo->meta.height == 1 && bo->meta.format == DRM_FORMAT_R8 && bo->meta.num_planes == 1;
+	if (!is_format_blob)
+		return false;
+
+	if (priv->init_subdrv_once) {
+		const char subdrv_path[] = "/dev/dma_heap/system";
+
+		priv->init_subdrv_once = false;
+
+		priv->subdrv_fd = open(subdrv_path, O_RDONLY | O_CLOEXEC);
+		if (priv->subdrv_fd >= 0) {
+			priv->subdrv = drv_create(priv->subdrv_fd, &backend_dma_heap);
+			if (!priv->subdrv) {
+				drv_logi("failed to create sub-driver\n");
+				close(priv->subdrv_fd);
+				priv->subdrv_fd = -1;
+			}
+		} else {
+			drv_logi("failed to open %s\n", subdrv_path);
+		}
+	}
+	if (!priv->subdrv)
+		return false;
+
+	bo->drv = priv->subdrv;
+	return true;
 }
 
 static int mediatek_bo_create_with_modifiers(struct bo *bo, uint32_t width, uint32_t height,
@@ -290,6 +344,15 @@ static int mediatek_bo_create_with_modifiers(struct bo *bo, uint32_t width, uint
 		errno = EINVAL;
 		drv_loge("no usable modifier found\n");
 		return -EINVAL;
+	}
+
+	if (bo_forward_to_subdrv(bo)) {
+		ret = bo->drv->backend->bo_compute_metadata(bo, width, height, format,
+							    bo->meta.use_flags, modifiers, count);
+		if (!ret)
+			ret = bo->drv->backend->bo_create_from_metadata(bo);
+
+		return ret;
 	}
 
 	/*
@@ -498,6 +561,14 @@ static int mediatek_bo_create(struct bo *bo, uint32_t width, uint32_t height, ui
 						 ARRAY_SIZE(modifiers));
 }
 
+static int mediatek_bo_import(struct bo *bo, struct drv_import_fd_data *data)
+{
+	if (bo_forward_to_subdrv(bo))
+		return bo->drv->backend->bo_import(bo, data);
+
+	return drv_prime_bo_import(bo, data);
+}
+
 static void *mediatek_bo_map(struct bo *bo, struct vma *vma, uint32_t map_flags)
 {
 	int ret, prime_fd;
@@ -669,7 +740,7 @@ const struct backend backend_mediatek = {
 	.bo_create = mediatek_bo_create,
 	.bo_create_with_modifiers = mediatek_bo_create_with_modifiers,
 	.bo_destroy = drv_gem_bo_destroy,
-	.bo_import = drv_prime_bo_import,
+	.bo_import = mediatek_bo_import,
 	.bo_export = drv_prime_bo_export,
 	.bo_map = mediatek_bo_map,
 	.bo_unmap = mediatek_bo_unmap,
