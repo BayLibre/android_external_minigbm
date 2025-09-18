@@ -496,6 +496,7 @@ const struct backend virtgpu_cross_domain = {
 	.close = cross_domain_close,
 	.bo_create = cross_domain_bo_create,
 	.bo_import = drv_prime_bo_import,
+	.bo_export = drv_prime_bo_export,
 	.bo_destroy = drv_gem_bo_destroy,
 	.bo_map = cross_domain_bo_map,
 	.bo_unmap = drv_bo_munmap,

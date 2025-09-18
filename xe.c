@@ -764,6 +764,7 @@ const struct backend backend_xe = {
 	.bo_unmap = drv_bo_munmap,
 	.num_planes_from_modifier = xe_num_planes_from_modifier,
 	.bo_import = xe_bo_import,
+	.bo_export = drv_prime_bo_export,
 	.bo_flush = xe_bo_flush,
 	.resolve_format_and_use_flags = drv_resolve_format_and_use_flags_helper,
 };

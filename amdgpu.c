@@ -876,6 +876,7 @@ const struct backend backend_amdgpu = {
 	.bo_release = amdgpu_release_bo,
 	.bo_destroy = amdgpu_destroy_bo,
 	.bo_import = amdgpu_import_bo,
+	.bo_export = drv_prime_bo_export,
 	.bo_map = amdgpu_map_bo,
 	.bo_unmap = amdgpu_unmap_bo,
 	.bo_invalidate = amdgpu_bo_invalidate,

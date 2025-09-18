@@ -673,23 +673,12 @@ union bo_handle drv_bo_get_plane_handle(struct bo *bo, size_t plane)
 
 int drv_bo_get_plane_fd(struct bo *bo, size_t plane)
 {
-
-	int ret, fd;
 	assert(plane < bo->meta.num_planes);
 
 	if (bo->is_test_buffer)
 		return -EINVAL;
 
-	ret = drmPrimeHandleToFD(bo->drv->fd, bo->handle.u32, DRM_CLOEXEC | DRM_RDWR, &fd);
-
-	// Older DRM implementations blocked DRM_RDWR, but gave a read/write mapping anyways
-	if (ret)
-		ret = drmPrimeHandleToFD(bo->drv->fd, bo->handle.u32, DRM_CLOEXEC, &fd);
-
-	if (ret)
-		drv_loge("Failed to get plane fd: %s\n", strerror(errno));
-
-	return (ret) ? ret : fd;
+	return bo->drv->backend->bo_export(bo, plane);
 }
 
 uint32_t drv_bo_get_plane_offset(struct bo *bo, size_t plane)

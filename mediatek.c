@@ -670,6 +670,7 @@ const struct backend backend_mediatek = {
 	.bo_create_with_modifiers = mediatek_bo_create_with_modifiers,
 	.bo_destroy = drv_gem_bo_destroy,
 	.bo_import = drv_prime_bo_import,
+	.bo_export = drv_prime_bo_export,
 	.bo_map = mediatek_bo_map,
 	.bo_unmap = mediatek_bo_unmap,
 	.bo_invalidate = mediatek_bo_invalidate,

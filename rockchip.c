@@ -279,6 +279,7 @@ const struct backend backend_rockchip = {
 	.bo_create_with_modifiers = rockchip_bo_create_with_modifiers,
 	.bo_destroy = drv_gem_bo_destroy,
 	.bo_import = drv_prime_bo_import,
+	.bo_export = drv_prime_bo_export,
 	.bo_map = rockchip_bo_map,
 	.bo_unmap = rockchip_bo_unmap,
 	.bo_invalidate = rockchip_bo_invalidate,
