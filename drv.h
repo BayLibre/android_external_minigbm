@@ -107,6 +107,7 @@ extern "C" {
 #endif
 
 // clang-format on
+struct backend;
 struct driver;
 struct bo;
 struct combination;
@@ -162,7 +163,7 @@ struct mapping {
 
 void drv_preload(bool load);
 
-struct driver *drv_create(int fd);
+struct driver *drv_create(int fd, const struct backend *backend);
 
 void drv_destroy(struct driver *drv);
 
