@@ -111,12 +111,18 @@ struct driver;
 struct bo;
 struct combination;
 
+/* Most backends use u32 (GEM handle). dma-heap backend uses fd (dma-buf).
+ *
+ * Note that drv.c assumes u32 in a few places. ptr/s64/u64 must not be used
+ * unless drv.c is fixed first.
+ */
 union bo_handle {
 	void *ptr;
 	int32_t s32;
 	uint32_t u32;
 	int64_t s64;
 	uint64_t u64;
+	int fd;
 };
 
 struct drv_import_fd_data {
