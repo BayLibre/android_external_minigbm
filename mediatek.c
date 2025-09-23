@@ -70,6 +70,10 @@
 #define USE_EXTRA_PADDING_FOR_YVU420
 #endif
 
+#if defined(MTK_MT8196)
+#define SUPPORT_PROTECTED_DMA_HEAP
+#endif
+
 struct mediatek_private_drv_data {
 	int dma_heap_fd;
 
@@ -135,10 +139,13 @@ static bool is_video_yuv_format(uint32_t format)
 	return false;
 }
 
+#define PROTECTED_DMA_HEAP_PATH "/dev/dma_heap/restricted_mtk_cma"
+
 static int mediatek_init(struct driver *drv)
 {
 	struct format_metadata metadata;
 	struct mediatek_private_drv_data *priv;
+	uint64_t protected = 0;
 
 	priv = calloc(1, sizeof(*priv));
 	if (!priv) {
@@ -146,7 +153,36 @@ static int mediatek_init(struct driver *drv)
 		return -errno;
 	}
 
+#ifdef SUPPORT_PROTECTED_DMA_HEAP
+	protected = BO_USE_PROTECTED;
+	priv->dma_heap_fd = open(PROTECTED_DMA_HEAP_PATH, O_RDONLY | O_CLOEXEC);
+#if defined(ANDROID)
+	// On ChromeOS, `protected` is always set to BO_USE_PROTECTED. There is
+	// an issue with the sandbox that prevents opening the DMA heap CMA
+	// file for some processes. For processes that need to actually allocate
+	// buffers, the open() call succeeds.
+	// TODO(b:444480658) figure out why open() fails in Chrome sometimes.
+	// On Android this unsets `protected` when there is no DMA heap support
+	// or if the file does not exist.
+#if (ANDROID_API_LEVEL >= 31 && defined(HAS_DMABUF_SYSTEM_HEAP))
+	if (priv->dma_heap_fd < 0) {
+		if (errno == EACCES) {
+			// The heap is there but we cannot access it.
+			// Still report that protected buffers are theoretically available.
+			// There will be a log message about sepolicy violation.
+		} else {
+			drv_logi("Failed opening secure CMA heap with error %s.\n",
+				 strerror(errno));
+			protected = 0;
+		}
+	}
+#else
+	protected = 0;
+#endif // (ANDROID_API_LEVEL >= 31 && defined(HAS_DMABUF_SYSTEM_HEAP))
+#endif // defined(ANDROID)
+#else
 	priv->dma_heap_fd = -1;
+#endif // SUPPORT_PROTECTED_DMA_HEAP
 
 	priv->init_subdrv_once = true;
 	priv->subdrv_fd = -1;
@@ -154,24 +190,23 @@ static int mediatek_init(struct driver *drv)
 	drv->priv = priv;
 
 	drv_add_combinations(drv, render_target_formats, ARRAY_SIZE(render_target_formats),
-			     &LINEAR_METADATA,
-			     BO_USE_RENDER_MASK | BO_USE_SCANOUT | BO_USE_PROTECTED);
+			     &LINEAR_METADATA, BO_USE_RENDER_MASK | BO_USE_SCANOUT | protected);
 
 	drv_add_combinations(drv, texture_source_formats, ARRAY_SIZE(texture_source_formats),
-			     &LINEAR_METADATA, BO_USE_TEXTURE_MASK | BO_USE_PROTECTED);
+			     &LINEAR_METADATA, BO_USE_TEXTURE_MASK | protected);
 
 	drv_add_combination(drv, DRM_FORMAT_R8, &LINEAR_METADATA,
-			    BO_USE_SW_MASK | BO_USE_LINEAR | BO_USE_PROTECTED);
+			    BO_USE_SW_MASK | BO_USE_LINEAR | protected);
 
 #ifdef SUPPORT_AR30_OVERLAYS
 	drv_add_combination(drv, DRM_FORMAT_ARGB2101010, &LINEAR_METADATA,
-			    BO_USE_TEXTURE | BO_USE_SCANOUT | BO_USE_PROTECTED | BO_USE_LINEAR);
+			    BO_USE_TEXTURE | BO_USE_SCANOUT | protected | BO_USE_LINEAR);
 #endif
 
 	/* YUYV format for video overlay and camera subsystem. */
 	drv_add_combination(drv, DRM_FORMAT_YUYV, &LINEAR_METADATA,
 			    BO_USE_HW_VIDEO_DECODER | BO_USE_SCANOUT | BO_USE_LINEAR |
-				BO_USE_TEXTURE | BO_USE_PROTECTED);
+				BO_USE_TEXTURE | protected);
 
 	/* Android CTS tests require this. */
 	drv_add_combination(drv, DRM_FORMAT_BGR888, &LINEAR_METADATA, BO_USE_SW_MASK);
@@ -181,7 +216,7 @@ static int mediatek_init(struct driver *drv)
 	metadata.priority = 1;
 	metadata.modifier = DRM_FORMAT_MOD_LINEAR;
 	drv_modify_combination(drv, DRM_FORMAT_YVU420, &metadata,
-			       BO_USE_HW_VIDEO_DECODER | BO_USE_PROTECTED);
+			       BO_USE_HW_VIDEO_DECODER | protected);
 #ifdef MTK_MT8173
 	/*
 	 * b/292507490: The MT8173 decoder can output YUV420 only. Some CTS tests feed the
@@ -192,13 +227,13 @@ static int mediatek_init(struct driver *drv)
 	drv_modify_combination(drv, DRM_FORMAT_YVU420, &metadata, BO_USE_HW_VIDEO_ENCODER);
 #endif
 	drv_modify_combination(drv, DRM_FORMAT_YVU420_ANDROID, &metadata,
-			       BO_USE_HW_VIDEO_DECODER | BO_USE_PROTECTED);
+			       BO_USE_HW_VIDEO_DECODER | protected);
 #ifndef MTK_MT8173
 	drv_modify_combination(drv, DRM_FORMAT_NV12, &metadata,
-			       BO_USE_HW_VIDEO_DECODER | BO_USE_PROTECTED);
+			       BO_USE_HW_VIDEO_DECODER | protected);
 #endif
 	drv_modify_combination(drv, DRM_FORMAT_P010, &metadata,
-			       BO_USE_HW_VIDEO_DECODER | BO_USE_PROTECTED);
+			       BO_USE_HW_VIDEO_DECODER | protected);
 
 	/*
 	 * R8 format is used for Android's HAL_PIXEL_FORMAT_BLOB for input/output from
@@ -497,9 +532,10 @@ static int mediatek_bo_create_with_modifiers(struct bo *bo, uint32_t width, uint
 
 		if (priv->dma_heap_fd < 0) {
 			priv->dma_heap_fd =
-			    open("/dev/dma_heap/restricted_mtk_cma", O_RDONLY | O_CLOEXEC);
+			    open(PROTECTED_DMA_HEAP_PATH, O_RDONLY | O_CLOEXEC);
 			if (priv->dma_heap_fd < 0) {
-				drv_loge("Failed opening secure CMA heap errno=%d\n", -errno);
+				drv_loge("Failed opening secure CMA heap with error %s.\n",
+					 strerror(errno));
 				return -errno;
 			}
 		}
