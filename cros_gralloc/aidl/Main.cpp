@@ -32,8 +32,9 @@ int main(int /*argc*/, char** /*argv*/) {
     }
 
     const std::string instance = std::string() + Allocator::descriptor + "/default";
-    binder_status_t status =
-            AServiceManager_addService(allocator->asBinder().get(), instance.c_str());
+    binder_status_t status = AServiceManager_addServiceWithFlags(
+            allocator->asBinder().get(), instance.c_str(),
+            AServiceManager_AddServiceFlag::ADD_SERVICE_ALLOW_ISOLATED);
     CHECK_EQ(status, STATUS_OK);
 
     ABinderProcess_setThreadPoolMaxThreadCount(4);
