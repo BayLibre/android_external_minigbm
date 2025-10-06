@@ -555,7 +555,7 @@ static int virgl_3d_bo_create(struct bo *bo, uint32_t width, uint32_t height, ui
 	res_create.last_level = 0;
 	res_create.nr_samples = 0;
 
-	res_create.size = ALIGN(bo->meta.total_size, PAGE_SIZE); // PAGE_SIZE = 0x1000
+	res_create.size = ALIGN(bo->meta.total_size, getpagesize());
 	ret = drmIoctl(bo->drv->fd, DRM_IOCTL_VIRTGPU_RESOURCE_CREATE, &res_create);
 	if (ret) {
 		drv_loge("DRM_IOCTL_VIRTGPU_RESOURCE_CREATE failed with %s\n", strerror(errno));
@@ -928,7 +928,7 @@ static int virgl_blob_get_host_format(struct driver *drv, struct bo_metadata *me
 	}
 	pthread_mutex_unlock(&priv->host_blob_format_lock);
 
-	meta->total_size = ALIGN(meta->total_size, PAGE_SIZE);
+	meta->total_size = ALIGN(meta->total_size, getpagesize());
 	meta->tiling = blob_flags_from_use_flags(meta->use_flags);
 
 	return 0;
