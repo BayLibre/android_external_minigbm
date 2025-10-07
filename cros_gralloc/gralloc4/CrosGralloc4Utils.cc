@@ -64,7 +64,7 @@ int convertToCrosDescriptor(const BufferDescriptorInfo& descriptor,
     outCrosDescriptor->droid_usage = descriptor.usage;
     outCrosDescriptor->enable_metadata_fd = true;
     outCrosDescriptor->client_metadata_size = descriptor.reservedSize;
-    if (descriptor.layerCount > 1) {
+    if (descriptor.layerCount != 1) {
         ALOGE("Failed to convert descriptor. Unsupported layerCount: %d", descriptor.layerCount);
         return -EINVAL;
     }
