@@ -178,8 +178,7 @@ static int xe_add_combinations(struct driver *drv)
 	 * Currently: NV12, P010, linear YV12
 	 */
 	for (unsigned i = 0; i < ARRAY_SIZE(external_resolve_formats); i++) {
-		drv_modify_combination(drv, external_resolve_formats[i], &metadata_linear,
-				       render);
+		drv_modify_combination(drv, external_resolve_formats[i], &metadata_linear, render);
 	}
 
 	/* Android CTS tests require this. */
