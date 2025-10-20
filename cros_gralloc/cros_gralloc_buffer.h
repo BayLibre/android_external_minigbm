@@ -10,10 +10,12 @@
 #include <memory>
 #include <optional>
 
+#ifndef HAS_NO_AIDL_METADATA
 #include <aidl/android/hardware/graphics/common/BlendMode.h>
 #include <aidl/android/hardware/graphics/common/Cta861_3.h>
 #include <aidl/android/hardware/graphics/common/Dataspace.h>
 #include <aidl/android/hardware/graphics/common/Smpte2086.h>
+#endif // HAS_NO_AIDL_METADATA
 
 #include "cros_gralloc_helpers.h"
 
@@ -44,6 +46,7 @@ class cros_gralloc_buffer
 
 	int32_t get_name(std::optional<std::string> *name) const;
 
+#ifndef HAS_NO_AIDL_METADATA
 	int32_t get_blend_mode(
 	    std::optional<aidl::android::hardware::graphics::common::BlendMode> *blend_mode) const;
 	int32_t set_blend_mode(aidl::android::hardware::graphics::common::BlendMode blend_mode);
@@ -61,6 +64,7 @@ class cros_gralloc_buffer
 	    std::optional<aidl::android::hardware::graphics::common::Smpte2086> *smpte) const;
 	int32_t
 	set_smpte2086(std::optional<aidl::android::hardware::graphics::common::Smpte2086> smpte);
+#endif // HAS_NO_AIDL_METADATA
 
 	/* The new reference count is returned by both these functions. */
 	int32_t increase_refcount();

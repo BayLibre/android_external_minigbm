@@ -10,10 +10,12 @@
 #include <optional>
 #include <type_traits>
 
+#ifndef HAS_NO_AIDL_METADATA
 #include <aidl/android/hardware/graphics/common/BlendMode.h>
 #include <aidl/android/hardware/graphics/common/Cta861_3.h>
 #include <aidl/android/hardware/graphics/common/Dataspace.h>
 #include <aidl/android/hardware/graphics/common/Smpte2086.h>
+#endif // HAS_NO_AIDL_METADATA
 
 #include "cros_gralloc_helpers.h"
 
@@ -55,10 +57,12 @@ struct cros_gralloc_buffer_metadata {
 	 * handles.
 	 */
 	char name[CROS_GRALLOC_BUFFER_METADATA_MAX_NAME_SIZE];
+#ifndef HAS_NO_AIDL_METADATA
 	aidl::android::hardware::graphics::common::BlendMode blend_mode;
 	aidl::android::hardware::graphics::common::Dataspace dataspace;
 	cros_buffer_optional<aidl::android::hardware::graphics::common::Cta861_3> cta861_3;
 	cros_buffer_optional<aidl::android::hardware::graphics::common::Smpte2086> smpte2086;
+#endif // HAS_NO_AIDL_METADATA
 };
 
 static_assert(std::is_standard_layout_v<cros_gralloc_buffer_metadata>);

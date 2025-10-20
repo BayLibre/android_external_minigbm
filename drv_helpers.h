@@ -16,10 +16,6 @@ extern "C" {
 #include "drv.h"
 #include "drv_array_helpers.h"
 
-#ifndef PAGE_SIZE
-#define PAGE_SIZE 0x1000
-#endif
-
 struct format_metadata;
 
 uint32_t drv_height_from_format(uint32_t format, uint32_t height, size_t plane);

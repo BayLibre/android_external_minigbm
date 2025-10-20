@@ -43,6 +43,10 @@ using ::android::base::unique_fd;
     REQUIRE_DRIVER()                                    \
     VALIDATE_BUFFER_HANDLE(bufferHandle)
 
+#ifdef HAS_NO_AIDL_METADATA
+static_assert(false, "Must not define HAS_NO_AIDL_METADATA when gralloc5 is enabled");
+#endif
+
 static_assert(CROS_GRALLOC_BUFFER_METADATA_MAX_NAME_SIZE >=
                       decltype(std::declval<BufferDescriptorInfo>().name){}.size(),
               "Metadata name storage too small to fit a BufferDescriptorInfo::name");

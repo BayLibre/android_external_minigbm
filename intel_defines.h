@@ -35,6 +35,12 @@ static const uint32_t image_storage_formats[] = {
 	DRM_FORMAT_R8,
 };
 
+static const uint32_t external_resolve_formats[] = {
+	DRM_FORMAT_YVU420_ANDROID, // AHARDWAREBUFFER_FORMAT_YV12
+	DRM_FORMAT_NV12,	   // AHARDWAREBUFFER_FORMAT_Y8Cb8Cr8_420
+	DRM_FORMAT_P010,	   // AHARDWAREBUFFER_FORMAT_YCbCr_P010
+};
+
 static const uint64_t gen12_modifier_order[] = {
 	I915_FORMAT_MOD_Y_TILED_GEN12_RC_CCS,
 	I915_FORMAT_MOD_Y_TILED,
@@ -77,4 +83,5 @@ const uint16_t lnl_ids[] = {
 	0x64B0,
 };
 
-const uint16_t ptl_ids[] = { 0xB080, 0xB081, 0xB082, 0xB083, 0xB08F, 0xB090, 0xB0A0, 0xB0B0 };
+const uint16_t ptl_ids[] = { 0xB080, 0xB081, 0xB082, 0xB083, 0xB08F,
+			     0xB090, 0xB0A0, 0xB0B0, 0xFD80, 0xFD81 };

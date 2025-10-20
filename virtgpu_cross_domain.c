@@ -7,6 +7,7 @@
 #include <errno.h>
 #include <string.h>
 #include <sys/mman.h>
+#include <unistd.h>
 #include <xf86drm.h>
 
 #include "drv_helpers.h"
@@ -46,7 +47,7 @@ static void cross_domain_release_private(struct driver *drv)
 	struct drm_gem_close gem_close = { 0 };
 
 	if (priv->ring_addr != MAP_FAILED)
-		munmap(priv->ring_addr, PAGE_SIZE);
+		munmap(priv->ring_addr, getpagesize());
 
 	if (priv->ring_handle) {
 		gem_close.handle = priv->ring_handle;
@@ -242,6 +243,8 @@ static int cross_domain_init(struct driver *drv)
 	struct CrossDomainInit cmd_init;
 	struct CrossDomainCapabilities cross_domain_caps;
 
+	const size_t page_size = getpagesize();
+
 	memset(&cmd_init, 0, sizeof(cmd_init));
 	if (!params[param_context_init].value)
 		return -ENOTSUP;
@@ -309,7 +312,7 @@ static int cross_domain_init(struct driver *drv)
 	}
 
 	// Create a shared ring buffer to read metadata queries.
-	drm_rc_blob.size = PAGE_SIZE;
+	drm_rc_blob.size = page_size;
 	drm_rc_blob.blob_mem = VIRTGPU_BLOB_MEM_GUEST;
 	drm_rc_blob.blob_flags = VIRTGPU_BLOB_FLAG_USE_MAPPABLE;
 
@@ -330,7 +333,7 @@ static int cross_domain_init(struct driver *drv)
 	}
 
 	priv->ring_addr =
-	    mmap(0, PAGE_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, drv->fd, map.offset);
+	    mmap(0, page_size, PROT_READ | PROT_WRITE, MAP_SHARED, drv->fd, map.offset);
 
 	if (priv->ring_addr == MAP_FAILED) {
 		drv_loge("mmap failed with %s\n", strerror(errno));

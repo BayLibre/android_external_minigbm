@@ -13,10 +13,12 @@
 
 #include "cros_gralloc_buffer_metadata.h"
 
+#ifndef HAS_NO_AIDL_METADATA
 using aidl::android::hardware::graphics::common::BlendMode;
 using aidl::android::hardware::graphics::common::Cta861_3;
 using aidl::android::hardware::graphics::common::Dataspace;
 using aidl::android::hardware::graphics::common::Smpte2086;
+#endif // HAS_NO_AIDL_METADATA
 
 /*static*/
 std::unique_ptr<cros_gralloc_buffer>
@@ -47,6 +49,7 @@ cros_gralloc_buffer::initialize_metadata(const struct cros_gralloc_buffer_descri
 {
 	struct cros_gralloc_buffer_metadata *metadata;
 
+	assert(descriptor->enable_metadata_fd);
 	int ret = get_metadata(&metadata);
 	if (ret) {
 		ALOGE("Failed to initialize metadata: failed to get metadata region.");
@@ -62,8 +65,10 @@ cros_gralloc_buffer::initialize_metadata(const struct cros_gralloc_buffer_descri
 
 	snprintf(metadata->name, CROS_GRALLOC_BUFFER_METADATA_MAX_NAME_SIZE, "%s",
 		 descriptor->name.c_str());
+#ifndef HAS_NO_AIDL_METADATA
 	metadata->dataspace = descriptor->dataspace;
 	metadata->blend_mode = descriptor->blend;
+#endif // HAS_NO_AIDL_METADATA
 	return 0;
 }
 
@@ -174,6 +179,7 @@ int32_t cros_gralloc_buffer::get_name(std::optional<std::string> *name) const
 	return 0;
 }
 
+#ifndef HAS_NO_AIDL_METADATA
 int32_t cros_gralloc_buffer::get_blend_mode(std::optional<BlendMode> *blend_mode) const
 {
 	const struct cros_gralloc_buffer_metadata *metadata;
@@ -285,6 +291,7 @@ int32_t cros_gralloc_buffer::set_smpte2086(std::optional<Smpte2086> smpte)
 	metadata->smpte2086 = smpte;
 	return 0;
 }
+#endif // HAS_NO_AIDL_METADATA
 
 int32_t cros_gralloc_buffer::increase_refcount()
 {
