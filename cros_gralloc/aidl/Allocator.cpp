@@ -90,7 +90,7 @@ ndk::ScopedAStatus Allocator::allocate(const std::vector<uint8_t>& encodedDescri
 }
 
 ndk::ScopedAStatus Allocator::allocate2(const BufferDescriptorInfo& descriptor, int32_t count,
-                            allocator::AllocationResult* outResult) {
+                                        allocator::AllocationResult* outResult) {
     if (!mDriver) {
         ALOGE("Failed to allocate. Driver is uninitialized.\n");
         return ToBinderStatus(AllocationError::NO_RESOURCES);

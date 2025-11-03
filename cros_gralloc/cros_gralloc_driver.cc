@@ -109,7 +109,7 @@ static struct driver *init_try_node(int idx, char const *str)
 	if (fd < 0)
 		return NULL;
 
-	drv = drv_create(fd);
+	drv = drv_create(fd, NULL);
 	if (!drv)
 		close(fd);
 

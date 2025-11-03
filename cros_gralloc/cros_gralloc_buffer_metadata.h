@@ -19,7 +19,7 @@
 
 #include "cros_gralloc_helpers.h"
 
-// Simple replacement for std::optional which is not guarenteed to be memory layout
+// Simple replacement for std::optional which is not guaranteed to be memory layout
 // stable across ABIs.
 template <typename T> struct cros_buffer_optional {
 

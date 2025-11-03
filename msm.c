@@ -380,6 +380,7 @@ const struct backend backend_msm = {
 	.bo_create_with_modifiers = msm_bo_create_with_modifiers,
 	.bo_destroy = drv_gem_bo_destroy,
 	.bo_import = drv_prime_bo_import,
+	.bo_export = drv_prime_bo_export,
 	.bo_map = msm_bo_map,
 	.bo_unmap = drv_bo_munmap,
 	.resolve_format_and_use_flags = drv_resolve_format_and_use_flags_helper,

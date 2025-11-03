@@ -115,7 +115,7 @@ static const struct backend *drv_get_backend(int fd)
 	return NULL;
 }
 
-struct driver *drv_create(int fd)
+struct driver *drv_create(int fd, const struct backend *backend)
 {
 	struct driver *drv;
 	int ret;
@@ -132,7 +132,7 @@ struct driver *drv_create(int fd)
 	drv->log_bos = (minigbm_debug && strstr(minigbm_debug, "log_bos") != NULL);
 
 	drv->fd = fd;
-	drv->backend = drv_get_backend(fd);
+	drv->backend = backend ? backend : drv_get_backend(fd);
 
 	if (!drv->backend)
 		goto free_driver;
@@ -156,6 +156,7 @@ struct driver *drv_create(int fd)
 		goto free_mappings;
 
 	if (drv->backend->init) {
+		/* this might update drv->backend to point to another sub-backend */
 		ret = drv->backend->init(drv);
 		if (ret) {
 			drv_array_destroy(drv->combos);
@@ -365,6 +366,7 @@ struct bo *drv_bo_create(struct driver *drv, uint32_t width, uint32_t height, ui
 		if (!is_test_alloc && ret == 0)
 			ret = drv->backend->bo_create_from_metadata(bo);
 	} else if (!is_test_alloc) {
+		/* this might update bo->drv to point to another sub-driver */
 		ret = drv->backend->bo_create(bo, width, height, format, use_flags);
 	}
 
@@ -405,6 +407,7 @@ struct bo *drv_bo_create_with_modifiers(struct driver *drv, uint32_t width, uint
 		if (ret == 0)
 			ret = drv->backend->bo_create_from_metadata(bo);
 	} else {
+		/* this might update bo->drv to point to another sub-driver */
 		ret = drv->backend->bo_create_with_modifiers(bo, width, height, format, modifiers,
 							     count);
 	}
@@ -444,6 +447,7 @@ struct bo *drv_bo_import(struct driver *drv, struct drv_import_fd_data *data)
 	if (!bo)
 		return NULL;
 
+	/* this might update bo->drv to point to another sub-driver */
 	ret = drv->backend->bo_import(bo, data);
 	if (ret) {
 		free(bo);
@@ -673,23 +677,12 @@ union bo_handle drv_bo_get_plane_handle(struct bo *bo, size_t plane)
 
 int drv_bo_get_plane_fd(struct bo *bo, size_t plane)
 {
-
-	int ret, fd;
 	assert(plane < bo->meta.num_planes);
 
 	if (bo->is_test_buffer)
 		return -EINVAL;
 
-	ret = drmPrimeHandleToFD(bo->drv->fd, bo->handle.u32, DRM_CLOEXEC | DRM_RDWR, &fd);
-
-	// Older DRM implementations blocked DRM_RDWR, but gave a read/write mapping anyways
-	if (ret)
-		ret = drmPrimeHandleToFD(bo->drv->fd, bo->handle.u32, DRM_CLOEXEC, &fd);
-
-	if (ret)
-		drv_loge("Failed to get plane fd: %s\n", strerror(errno));
-
-	return (ret) ? ret : fd;
+	return bo->drv->backend->bo_export(bo, plane);
 }
 
 uint32_t drv_bo_get_plane_offset(struct bo *bo, size_t plane)

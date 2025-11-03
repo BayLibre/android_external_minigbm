@@ -56,7 +56,7 @@ PUBLIC struct gbm_device *gbm_create_device(int fd)
 	if (!gbm)
 		return NULL;
 
-	gbm->drv = drv_create(fd);
+	gbm->drv = drv_create(fd, NULL);
 	if (!gbm->drv) {
 		free(gbm);
 		return NULL;

@@ -1049,6 +1049,7 @@ const struct backend backend_i915 = {
 	.bo_create_from_metadata = i915_bo_create_from_metadata,
 	.bo_destroy = drv_gem_bo_destroy,
 	.bo_import = i915_bo_import,
+	.bo_export = drv_prime_bo_export,
 	.bo_map = i915_bo_map,
 	.bo_unmap = drv_bo_munmap,
 	.bo_invalidate = i915_bo_invalidate,
