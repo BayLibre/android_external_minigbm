@@ -41,6 +41,7 @@
 #if defined(MTK_MT8183) || \
     defined(MTK_MT8186) || \
     defined(MTK_MT8188G) || \
+    defined(MTK_MT8189) || \
     defined(MTK_MT8192) || \
     defined(MTK_MT8195) || \
     defined(MTK_MT8196)
@@ -69,8 +70,16 @@
 #define USE_EXTRA_PADDING_FOR_YVU420
 #endif
 
+#if defined(MTK_MT8196)
+#define SUPPORT_PROTECTED_DMA_HEAP
+#endif
+
 struct mediatek_private_drv_data {
 	int dma_heap_fd;
+
+	bool init_subdrv_once;
+	int subdrv_fd;
+	struct driver *subdrv;
 };
 
 struct mediatek_private_map_data {
@@ -130,11 +139,13 @@ static bool is_video_yuv_format(uint32_t format)
 	return false;
 }
 
+#define PROTECTED_DMA_HEAP_PATH "/dev/dma_heap/restricted_mtk_cma"
+
 static int mediatek_init(struct driver *drv)
 {
 	struct format_metadata metadata;
 	struct mediatek_private_drv_data *priv;
-	uint64_t protected = BO_USE_PROTECTED;
+	uint64_t protected = 0;
 
 	priv = calloc(1, sizeof(*priv));
 	if (!priv) {
@@ -142,16 +153,39 @@ static int mediatek_init(struct driver *drv)
 		return -errno;
 	}
 
-#if defined(HAS_DMABUF_SYSTEM_HEAP)
-	priv->dma_heap_fd = open("/dev/dma_heap/restricted_mtk_cma", O_RDONLY | O_CLOEXEC);
+#ifdef SUPPORT_PROTECTED_DMA_HEAP
+	protected = BO_USE_PROTECTED;
+	priv->dma_heap_fd = open(PROTECTED_DMA_HEAP_PATH, O_RDONLY | O_CLOEXEC);
+#if defined(ANDROID)
+	// On ChromeOS, `protected` is always set to BO_USE_PROTECTED. There is
+	// an issue with the sandbox that prevents opening the DMA heap CMA
+	// file for some processes. For processes that need to actually allocate
+	// buffers, the open() call succeeds.
+	// TODO(b:444480658) figure out why open() fails in Chrome sometimes.
+	// On Android this unsets `protected` when there is no DMA heap support
+	// or if the file does not exist.
+#if (ANDROID_API_LEVEL >= 31 && defined(HAS_DMABUF_SYSTEM_HEAP))
 	if (priv->dma_heap_fd < 0) {
-		drv_loge("Failed opening secure CMA heap errno=%d\n", -errno);
-		protected = 0;
+		if (errno == EACCES) {
+			// The heap is there but we cannot access it.
+			// Still report that protected buffers are theoretically available.
+			// There will be a log message about sepolicy violation.
+		} else {
+			drv_logi("Failed opening secure CMA heap with error %s.\n",
+				 strerror(errno));
+			protected = 0;
+		}
 	}
 #else
-	priv->dma_heap_fd = -1;
 	protected = 0;
-#endif
+#endif // (ANDROID_API_LEVEL >= 31 && defined(HAS_DMABUF_SYSTEM_HEAP))
+#endif // defined(ANDROID)
+#else
+	priv->dma_heap_fd = -1;
+#endif // SUPPORT_PROTECTED_DMA_HEAP
+
+	priv->init_subdrv_once = true;
+	priv->subdrv_fd = -1;
 
 	drv->priv = priv;
 
@@ -259,8 +293,54 @@ static void mediatek_close(struct driver *drv)
 	if (priv->dma_heap_fd >= 0)
 		close(priv->dma_heap_fd);
 
+	if (priv->subdrv) {
+		drv_destroy(priv->subdrv);
+		close(priv->subdrv_fd);
+	}
+
 	free(priv);
 	drv->priv = NULL;
+}
+
+static bool bo_forward_to_subdrv(struct bo *bo)
+{
+	struct mediatek_private_drv_data *priv = bo->drv->priv;
+
+	/* drm_mediatek allocates from 32-bit dma address space. When there is
+	 * no known HW usage, we can allocate from the sub-driver to
+	 * circumvent the limit.
+	 */
+	if (bo->meta.use_flags & BO_USE_HW_MASK)
+		return false;
+
+	/* Limit the forward to blobs for now. */
+	const bool is_format_blob =
+	    bo->meta.height == 1 && bo->meta.format == DRM_FORMAT_R8 && bo->meta.num_planes == 1;
+	if (!is_format_blob)
+		return false;
+
+	if (priv->init_subdrv_once) {
+		const char subdrv_path[] = "/dev/dma_heap/system";
+
+		priv->init_subdrv_once = false;
+
+		priv->subdrv_fd = open(subdrv_path, O_RDONLY | O_CLOEXEC);
+		if (priv->subdrv_fd >= 0) {
+			priv->subdrv = drv_create(priv->subdrv_fd, &backend_dma_heap);
+			if (!priv->subdrv) {
+				drv_logi("failed to create sub-driver\n");
+				close(priv->subdrv_fd);
+				priv->subdrv_fd = -1;
+			}
+		} else {
+			drv_logi("failed to open %s\n", subdrv_path);
+		}
+	}
+	if (!priv->subdrv)
+		return false;
+
+	bo->drv = priv->subdrv;
+	return true;
 }
 
 static int mediatek_bo_create_with_modifiers(struct bo *bo, uint32_t width, uint32_t height,
@@ -299,6 +379,15 @@ static int mediatek_bo_create_with_modifiers(struct bo *bo, uint32_t width, uint
 		errno = EINVAL;
 		drv_loge("no usable modifier found\n");
 		return -EINVAL;
+	}
+
+	if (bo_forward_to_subdrv(bo)) {
+		ret = bo->drv->backend->bo_compute_metadata(bo, width, height, format,
+							    bo->meta.use_flags, modifiers, count);
+		if (!ret)
+			ret = bo->drv->backend->bo_create_from_metadata(bo);
+
+		return ret;
 	}
 
 	/*
@@ -426,11 +515,6 @@ static int mediatek_bo_create_with_modifiers(struct bo *bo, uint32_t width, uint
 			.fd_flags = O_RDWR | O_CLOEXEC,
 		};
 
-		if (priv->dma_heap_fd < 0) {
-			drv_loge("Protected buffer requested but CMA heap doesn't exist.\n");
-			return -1;
-		}
-
 		if (format == DRM_FORMAT_P010) {
 			/*
 			 * Adjust the size so we don't waste tons of space. This was allocated
@@ -444,6 +528,16 @@ static int mediatek_bo_create_with_modifiers(struct bo *bo, uint32_t width, uint
 			bo->meta.offsets[1] = bo->meta.sizes[0];
 			bo->meta.total_size = bo->meta.total_size * 10 / 16;
 			heap_data.len = bo->meta.total_size;
+		}
+
+		if (priv->dma_heap_fd < 0) {
+			priv->dma_heap_fd =
+			    open(PROTECTED_DMA_HEAP_PATH, O_RDONLY | O_CLOEXEC);
+			if (priv->dma_heap_fd < 0) {
+				drv_loge("Failed opening secure CMA heap with error %s.\n",
+					 strerror(errno));
+				return -errno;
+			}
 		}
 
 		ret = ioctl(priv->dma_heap_fd, DMA_HEAP_IOCTL_ALLOC, &heap_data);
@@ -501,6 +595,14 @@ static int mediatek_bo_create(struct bo *bo, uint32_t width, uint32_t height, ui
 	uint64_t modifiers[] = { DRM_FORMAT_MOD_LINEAR };
 	return mediatek_bo_create_with_modifiers(bo, width, height, format, modifiers,
 						 ARRAY_SIZE(modifiers));
+}
+
+static int mediatek_bo_import(struct bo *bo, struct drv_import_fd_data *data)
+{
+	if (bo_forward_to_subdrv(bo))
+		return bo->drv->backend->bo_import(bo, data);
+
+	return drv_prime_bo_import(bo, data);
 }
 
 static void *mediatek_bo_map(struct bo *bo, struct vma *vma, uint32_t map_flags)
@@ -674,7 +776,8 @@ const struct backend backend_mediatek = {
 	.bo_create = mediatek_bo_create,
 	.bo_create_with_modifiers = mediatek_bo_create_with_modifiers,
 	.bo_destroy = drv_gem_bo_destroy,
-	.bo_import = drv_prime_bo_import,
+	.bo_import = mediatek_bo_import,
+	.bo_export = drv_prime_bo_export,
 	.bo_map = mediatek_bo_map,
 	.bo_unmap = mediatek_bo_unmap,
 	.bo_invalidate = mediatek_bo_invalidate,

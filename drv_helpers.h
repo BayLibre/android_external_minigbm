@@ -18,6 +18,8 @@ extern "C" {
 
 struct format_metadata;
 
+extern const struct backend backend_dma_heap;
+
 uint32_t drv_height_from_format(uint32_t format, uint32_t height, size_t plane);
 uint32_t drv_vertical_subsampling_from_format(uint32_t format, size_t plane);
 uint32_t drv_size_from_format(uint32_t format, uint32_t stride, uint32_t height, size_t plane);
@@ -34,6 +36,7 @@ int drv_dumb_bo_destroy(struct bo *bo);
 int drv_gem_close(struct driver *drv, uint32_t gem_handle);
 int drv_gem_bo_destroy(struct bo *bo);
 int drv_prime_bo_import(struct bo *bo, struct drv_import_fd_data *data);
+int drv_prime_bo_export(struct bo *bo, size_t plane);
 void *drv_dumb_bo_map(struct bo *bo, struct vma *vma, uint32_t map_flags);
 int drv_bo_munmap(struct bo *bo, struct vma *vma);
 int drv_get_prot(uint32_t map_flags);

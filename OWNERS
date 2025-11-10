@@ -7,7 +7,6 @@ hiroh@chromium.org
 mcasas@chromium.org
 niwa@chromium.org
 olv@google.com
-robdclark@chromium.org
 ryanneph@google.com
 tfiga@chromium.org
 zzyiwei@chromium.org
@@ -16,6 +15,8 @@ zzyiwei@chromium.org
 per-file amdgpu.c = basni@chromium.org, ddavenport@chromium.org, olv@google.com
 per-file i915.c = linyaa@google.com, msturner@google.com
 per-file mediatek.c = fshao@chromium.org, hsinyi@chromium.org
-per-file msm.c = robdclark@chromium.org
 per-file rockchip.c = tfiga@chromium.org
 per-file virtgpu* = dawnhan@google.com, natsu@google.com, zzyiwei@chromium.org
+
+# Robots.
+per-file common.mk = file:chromiumos/owners:v1:/bots/OWNERS.copybara
