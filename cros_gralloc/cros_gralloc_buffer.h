@@ -64,6 +64,9 @@ class cros_gralloc_buffer
 	    std::optional<aidl::android::hardware::graphics::common::Smpte2086> *smpte) const;
 	int32_t
 	set_smpte2086(std::optional<aidl::android::hardware::graphics::common::Smpte2086> smpte);
+
+	int32_t get_smpte2094_50(std::optional<std::vector<uint8_t>> *smpte) const;
+	int32_t set_smpte2094_50(const std::optional<std::vector<uint8_t>> &smpte);
 #endif // HAS_NO_AIDL_METADATA
 
 	/* The new reference count is returned by both these functions. */

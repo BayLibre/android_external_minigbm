@@ -68,6 +68,7 @@ cros_gralloc_buffer::initialize_metadata(const struct cros_gralloc_buffer_descri
 #ifndef HAS_NO_AIDL_METADATA
 	metadata->dataspace = descriptor->dataspace;
 	metadata->blend_mode = descriptor->blend;
+	metadata->smpte2094_50_size = 0;
 #endif // HAS_NO_AIDL_METADATA
 	return 0;
 }
@@ -284,11 +285,56 @@ int32_t cros_gralloc_buffer::set_smpte2086(std::optional<Smpte2086> smpte)
 
 	int ret = get_metadata(&metadata);
 	if (ret) {
-		ALOGE("Failed to set_cta861_3: failed to get metadata.");
+		ALOGE("Failed to set_smpte20986: failed to get metadata.");
 		return ret;
 	}
 
 	metadata->smpte2086 = smpte;
+	return 0;
+}
+
+int32_t cros_gralloc_buffer::get_smpte2094_50(std::optional<std::vector<uint8_t>> *smpte) const
+{
+	const struct cros_gralloc_buffer_metadata *metadata;
+
+	int ret = get_metadata(&metadata);
+	if (ret) {
+		ALOGE("Failed to get_smpte2094_50: failed to get metadata.");
+		return ret;
+	}
+
+	if (metadata->smpte2094_50_size <= 0) {
+		smpte->reset();
+	} else {
+		smpte->emplace(metadata->smpte2094_50.begin(),
+			       metadata->smpte2094_50.begin() + metadata->smpte2094_50_size);
+	}
+	return 0;
+}
+
+int32_t cros_gralloc_buffer::set_smpte2094_50(const std::optional<std::vector<uint8_t>> &smpte)
+{
+	struct cros_gralloc_buffer_metadata *metadata;
+
+	int ret = get_metadata(&metadata);
+	if (ret) {
+		ALOGE("Failed to set_smpte2094_50: failed to get metadata.");
+		return ret;
+	}
+
+	if (!smpte.has_value()) {
+		metadata->smpte2094_50_size = 0;
+		return 0;
+	}
+
+	if (smpte->size() > cros_gralloc_buffer_metadata::MAX_SMPTE2094_50_SIZE) {
+		ALOGE("Failed to set_smpte2094_50: metadata payload is too large: %zu",
+		      smpte->size());
+		return -1;
+	}
+
+	metadata->smpte2094_50_size = smpte->size();
+	std::copy(smpte->begin(), smpte->end(), metadata->smpte2094_50.begin());
 	return 0;
 }
 #endif // HAS_NO_AIDL_METADATA
