@@ -9,12 +9,12 @@ third_party {
   last_upgrade_date {
     year: 2025
     month: 11
-    day: 3
+    day: 14
   }
   homepage: "https://www.chromium.org/"
   identifier {
     type: "Git"
     value: "https://chromium.googlesource.com/chromiumos/platform/minigbm/"
-    version: "976a73d7be5f5e546f7ed79dcd41af3701d21ee6"
+    version: "b50cb6437527e8a00a3434c84004132ce9b40eb5"
   }
 }

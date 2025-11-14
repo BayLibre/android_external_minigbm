@@ -62,6 +62,11 @@ struct cros_gralloc_buffer_metadata {
 	aidl::android::hardware::graphics::common::Dataspace dataspace;
 	cros_buffer_optional<aidl::android::hardware::graphics::common::Cta861_3> cta861_3;
 	cros_buffer_optional<aidl::android::hardware::graphics::common::Smpte2086> smpte2086;
+	int32_t smpte2094_50_size;
+
+	static constexpr auto MAX_SMPTE2094_50_SIZE = 1028 * 10;
+	// 10 KB ought to be enough
+	std::array<uint8_t, MAX_SMPTE2094_50_SIZE> smpte2094_50;
 #endif // HAS_NO_AIDL_METADATA
 };
 
