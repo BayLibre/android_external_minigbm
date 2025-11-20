@@ -434,6 +434,12 @@ static int xe_init(struct driver *drv)
 static uint32_t xe_gem_create(struct bo *bo, int drv_fd, uint64_t size, uint32_t placement,
 			      uint32_t flags, uint16_t cpu_caching)
 {
+	struct xe_device *xe = bo->drv->priv;
+	struct drm_xe_ext_set_property create_ext = {
+		.base.name = DRM_XE_GEM_CREATE_EXTENSION_SET_PROPERTY,
+		.property = DRM_XE_GEM_CREATE_SET_PROPERTY_PXP_TYPE,
+		.value = DRM_XE_PXP_TYPE_HWDRM,
+	};
 	struct drm_xe_gem_create gem_create = {
 		.vm_id = 0, /*If .vm_id == 0, it is exportable via PRIME fd */
 		.size = size,
@@ -441,6 +447,10 @@ static uint32_t xe_gem_create(struct bo *bo, int drv_fd, uint64_t size, uint32_t
 		.flags = flags,
 		.cpu_caching = cpu_caching,
 	};
+
+	if (xe->has_hw_protection && (bo->meta.use_flags & BO_USE_PROTECTED)) {
+		gem_create.extensions = (uintptr_t)&create_ext;
+	}
 
 	int ret = drmIoctl(drv_fd, DRM_IOCTL_XE_GEM_CREATE, &gem_create);
 	if (ret) {
