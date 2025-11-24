@@ -507,6 +507,15 @@ int32_t CrosGrallocMapperV5::getStandardMetadata(const cros_gralloc_buffer* cros
             return cta ? provide(*cta) : 0;
         }
     }
+    if constexpr (metadataType == StandardMetadataType::SMPTE2094_50) {
+        std::optional<std::vector<uint8_t>> smpte;
+        if (crosBuffer->get_smpte2094_50(&smpte)) {
+            return -AIMAPPER_ERROR_NO_RESOURCES;
+        } else {
+            return smpte ? provide(*smpte) : 0;
+        }
+    }
+
     return -AIMAPPER_ERROR_UNSUPPORTED;
 }
 
@@ -552,6 +561,7 @@ AIMapper_Error CrosGrallocMapperV5::setStandardMetadata(buffer_handle_t _Nonnull
         case StandardMetadataType::CTA861_3:
         case StandardMetadataType::DATASPACE:
         case StandardMetadataType::SMPTE2086:
+        case StandardMetadataType::SMPTE2094_50:
             break;
 
         // Everything else unsupported
@@ -586,6 +596,9 @@ AIMapper_Error CrosGrallocMapperV5::setStandardMetadata(
     if constexpr (TYPE == StandardMetadataType::SMPTE2086) {
         ret = crosBuffer->set_smpte2086(value);
     }
+    if constexpr (TYPE == StandardMetadataType::SMPTE2094_50) {
+        ret = crosBuffer->set_smpte2094_50(value);
+    }
 
     if (ret) {
         return AIMAPPER_ERROR_NO_RESOURCES;
@@ -607,7 +620,7 @@ constexpr AIMapper_MetadataTypeDescription describeStandard(StandardMetadataType
 AIMapper_Error CrosGrallocMapperV5::listSupportedMetadataTypes(
         const AIMapper_MetadataTypeDescription* _Nullable* _Nonnull outDescriptionList,
         size_t* _Nonnull outNumberOfDescriptions) {
-    static constexpr std::array<AIMapper_MetadataTypeDescription, 24> sSupportedMetadaTypes{
+    static constexpr std::array<AIMapper_MetadataTypeDescription, 25> sSupportedMetadaTypes{
             describeStandard(StandardMetadataType::BUFFER_ID, true, false),
             describeStandard(StandardMetadataType::NAME, true, false),
             describeStandard(StandardMetadataType::WIDTH, true, false),
@@ -630,7 +643,12 @@ AIMapper_Error CrosGrallocMapperV5::listSupportedMetadataTypes(
             describeStandard(StandardMetadataType::SMPTE2086, true, true),
             describeStandard(StandardMetadataType::CTA861_3, true, true),
             describeStandard(StandardMetadataType::STRIDE, true, false),
-            {kArmMetadataTypePlaneFds, "Vector of file descriptors of each plane", true, false, {0}},
+            describeStandard(StandardMetadataType::SMPTE2094_50, true, true),
+            {kArmMetadataTypePlaneFds,
+             "Vector of file descriptors of each plane",
+             true,
+             false,
+             {0}},
             {kArmMetadataTypeFormatDataType, "Format data type", true, false, {0}},
     };
     *outDescriptionList = sSupportedMetadaTypes.data();
@@ -643,7 +661,7 @@ void CrosGrallocMapperV5::dumpBuffer(
         std::function<void(AIMapper_MetadataType, const std::vector<uint8_t>&)> callback) {
     // Temp buffer of ~10kb, should be large enough for any of the metadata we want to dump
     std::vector<uint8_t> tempBuffer;
-    tempBuffer.resize(10000);
+    tempBuffer.resize(10280);
     AIMapper_MetadataType metadataType;
     metadataType.name = STANDARD_METADATA_NAME;
 
@@ -695,6 +713,7 @@ void CrosGrallocMapperV5::dumpBuffer(
     dump(StandardMetadata<StandardMetadataType::PLANE_LAYOUTS>{});
     dump(StandardMetadata<StandardMetadataType::DATASPACE>{});
     dump(StandardMetadata<StandardMetadataType::BLEND_MODE>{});
+    dump(StandardMetadata<StandardMetadataType::SMPTE2094_50>{});
 }
 
 AIMapper_Error CrosGrallocMapperV5::dumpBuffer(
