@@ -8,13 +8,13 @@ third_party {
   license_type: NOTICE
   last_upgrade_date {
     year: 2025
-    month: 11
-    day: 14
+    month: 12
+    day: 5
   }
   homepage: "https://www.chromium.org/"
   identifier {
     type: "Git"
     value: "https://chromium.googlesource.com/chromiumos/platform/minigbm/"
-    version: "b50cb6437527e8a00a3434c84004132ce9b40eb5"
+    version: "6e152c485a488f25f957512c81b199f6a0e8719d"
   }
 }
