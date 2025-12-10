@@ -31,7 +31,7 @@ cc_binary {
     vintf_fragments: ["allocator.xml"],
     vendor: true,
     shared_libs: [
-        "android.hardware.graphics.allocator-V2-ndk",
+        "android.hardware.graphics.allocator-V3-ndk",
         "android.hardware.graphics.mapper@4.0",
         "libbase",
         "libbinder_ndk",
