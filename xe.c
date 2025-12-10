@@ -312,6 +312,27 @@ static int xe_align_dimensions(struct bo *bo, uint32_t format, uint32_t tiling, 
 	return 0;
 }
 
+static void xe_query_pxp_support(struct driver *drv, struct xe_device *xe)
+{
+	struct drm_xe_query_pxp_status pxp_status = {0};
+	struct drm_xe_device_query query = {
+		.extensions = 0,
+		.query = DRM_XE_DEVICE_QUERY_PXP_STATUS,
+		.size = sizeof(struct drm_xe_query_pxp_status),
+		.data = (uintptr_t)&pxp_status,
+	};
+
+	/* Ignore the transient status, the query will return an error if PXP
+	 * is not supported or disabled due to a fatal error during init.
+	 */
+	if (drmIoctl(drv->fd, DRM_IOCTL_XE_DEVICE_QUERY, &query) == 0) {
+		if (pxp_status.supported_session_types & 1u << DRM_XE_PXP_TYPE_HWDRM)
+			xe->has_hw_protection = 1;
+	} else {
+		drv_logi("Xe PXP not supported or disabled.");
+	}
+}
+
 static bool xe_query_config(struct driver *drv, struct xe_device *xe)
 {
 	struct drm_xe_device_query query = {
@@ -392,15 +413,14 @@ static int xe_init(struct driver *drv)
 
 	xe_query_config(drv, xe);
 
+	xe_query_pxp_support(drv, xe);
+
 	/* must call before xe->graphics_version is used anywhere else */
 	xe_info_from_device_id(xe);
 
 	xe_get_modifier_order(xe);
 
-	/* Xe still don't have support for protected content */
-	if (xe->graphics_version >= 12)
-		xe->has_hw_protection = 0;
-	else if (xe->graphics_version < 12) {
+	if (xe->graphics_version < 12) {
 		drv_loge("Xe driver is not supported on your platform: 0x%x\n", xe->device_id);
 		return -errno;
 	}
@@ -414,6 +434,12 @@ static int xe_init(struct driver *drv)
 static uint32_t xe_gem_create(struct bo *bo, int drv_fd, uint64_t size, uint32_t placement,
 			      uint32_t flags, uint16_t cpu_caching)
 {
+	struct xe_device *xe = bo->drv->priv;
+	struct drm_xe_ext_set_property create_ext = {
+		.base.name = DRM_XE_GEM_CREATE_EXTENSION_SET_PROPERTY,
+		.property = DRM_XE_GEM_CREATE_SET_PROPERTY_PXP_TYPE,
+		.value = DRM_XE_PXP_TYPE_HWDRM,
+	};
 	struct drm_xe_gem_create gem_create = {
 		.vm_id = 0, /*If .vm_id == 0, it is exportable via PRIME fd */
 		.size = size,
@@ -421,6 +447,10 @@ static uint32_t xe_gem_create(struct bo *bo, int drv_fd, uint64_t size, uint32_t
 		.flags = flags,
 		.cpu_caching = cpu_caching,
 	};
+
+	if (xe->has_hw_protection && (bo->meta.use_flags & BO_USE_PROTECTED)) {
+		gem_create.extensions = (uintptr_t)&create_ext;
+	}
 
 	int ret = drmIoctl(drv_fd, DRM_IOCTL_XE_GEM_CREATE, &gem_create);
 	if (ret) {
