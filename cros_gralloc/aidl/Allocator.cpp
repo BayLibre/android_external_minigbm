@@ -202,6 +202,17 @@ ndk::ScopedAStatus Allocator::getIMapperLibrarySuffix(std::string* outResult) {
     return ndk::ScopedAStatus::ok();
 }
 
+ndk::ScopedAStatus Allocator::isMultiViewSupported(const std::vector<BufferDescriptorInfo>& descriptor,
+                                                   int32_t baseViewIndex, bool* outResult) {
+    *outResult = false;
+    return ndk::ScopedAStatus::ok();
+}
+
+ndk::ScopedAStatus Allocator::allocateMultiView(const std::vector<BufferDescriptorInfo>& descriptor,
+                                                int32_t baseViewIndex, allocator::AllocationResult* outResult) {
+    return ToBinderStatus(AllocationError::UNSUPPORTED);
+}
+
 ::ndk::SpAIBinder Allocator::createBinder() {
     auto binder = BnAllocator::createBinder();
     AIBinder_setInheritRt(binder.get(), true);
