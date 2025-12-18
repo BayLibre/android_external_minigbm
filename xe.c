@@ -130,12 +130,12 @@ static int xe_add_combinations(struct driver *drv)
 {
 	struct xe_device *xe = drv->priv;
 
-	const uint64_t scanout_and_render = BO_USE_RENDER_MASK | BO_USE_SCANOUT;
-	const uint64_t render = BO_USE_RENDER_MASK;
-	const uint64_t texture_only = BO_USE_TEXTURE_MASK;
 	// HW protected buffers also need to be scanned out.
 	const uint64_t hw_protected =
 	    xe->has_hw_protection ? (BO_USE_PROTECTED | BO_USE_SCANOUT) : 0;
+	const uint64_t scanout_and_render = BO_USE_RENDER_MASK | BO_USE_SCANOUT | hw_protected;
+	const uint64_t render = BO_USE_RENDER_MASK;
+	const uint64_t texture_only = BO_USE_TEXTURE_MASK;
 
 	const uint64_t linear_mask = BO_USE_RENDERSCRIPT | BO_USE_LINEAR | BO_USE_SW_READ_OFTEN |
 				     BO_USE_SW_WRITE_OFTEN | BO_USE_SW_READ_RARELY |
