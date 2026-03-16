@@ -163,7 +163,8 @@ static bool is_running_with_software_rendering()
 	const char *vulkan_driver = drv_get_os_option("ro.hardware.vulkan");
 	if (!vulkan_driver)
 		vulkan_driver = drv_get_os_option("ro.board.platform");
-	return (vulkan_driver != nullptr && strstr(vulkan_driver, "pastel") != nullptr);
+	return (vulkan_driver != nullptr && (strstr(vulkan_driver, "lvp") != nullptr ||
+					     strstr(vulkan_driver, "pastel") != nullptr));
 }
 
 cros_gralloc_driver::cros_gralloc_driver()
