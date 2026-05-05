@@ -1,0 +1,37 @@
+// Copyright (C) 2021-2022 Roman Stratiienko (r.stratiienko@gmail.com)
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+
+soong_namespace {
+    imports: ["device/spacemit/k1/mesa"],
+}
+
+cc_library_shared {
+    name: "libgbm_mesa_wrapper",
+    vendor: true,
+    compile_multilib: "64",
+
+    srcs: [
+        "gbm_mesa_wrapper.c",
+    ],
+
+    cflags: [
+        "-Wall",
+        "-Wno-unused-parameter",
+        "-D_GNU_SOURCE=1",
+    ],
+
+    shared_libs: [
+        "libcutils",
+        "libdrm",
+        "libgbm_mesa",
+        "liblog",
+    ],
+
+    header_libs: [
+        "libminigbm_headers",
+    ],
+
+    export_include_dirs: ["."],
+}

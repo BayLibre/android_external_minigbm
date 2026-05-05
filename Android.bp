@@ -51,6 +51,9 @@ filegroup {
         "virtgpu_cross_domain.c",
         "virtgpu_virgl.c",
         "xe.c",
+        // gbm_mesa_driver backend (loaded dynamically)
+        "gbm_mesa_driver/gbm_mesa_driver.cpp",
+        "gbm_mesa_driver/gbm_mesa_internals.cpp",
     ],
 }
 
@@ -59,8 +62,8 @@ filegroup {
 
     srcs: [
         "cros_gralloc/cros_gralloc_buffer.cc",
-        "cros_gralloc/cros_gralloc_driver.cc",
         "cros_gralloc/cros_gralloc_helpers.cc",
+        "cros_gralloc/cros_gralloc_driver.cc",
     ],
 }
 
@@ -69,44 +72,44 @@ filegroup {
     srcs: ["cros_gralloc/gralloc0/gralloc0.cc"],
 }
 
-generic_cflags = ["-DHAS_DMABUF_SYSTEM_HEAP"]
+generic_cflags = [
+    "-DHAS_DMABUF_SYSTEM_HEAP",
+    "-DDRV_GBM_MESA",  // Enable gbm_mesa backend
+]
 intel_cflags = [
     "-DDRV_I915",
     "-DDRV_XE",
 ]
-meson_cflags = ["-DDRV_MESON"]
+meson_cflags = [
+    "-DDRV_MESON",
+    "-DDRV_GBM_MESA",  // Enable gbm_mesa backend for meson
+]
 msm_cflags = [
     "-DDRV_MSM",
-    "-DHAS_DMABUF_SYSTEM_HEAP",
     "-DQCOM_DISABLE_COMPRESSED_NV12",
-]
-
-mediatek_cflags = [
-    "-DDRV_MEDIATEK",
     "-DHAS_DMABUF_SYSTEM_HEAP",
 ]
+arcvm_cflags = ["-DVIRTIO_GPU_NEXT"]
 
 cc_defaults {
     name: "minigbm_defaults",
 
     cflags: [
-        "-D_FILE_OFFSET_BITS=64",
         "-D_GNU_SOURCE=1",
+        "-D_FILE_OFFSET_BITS=64",
         "-Wall",
-        "-Wcast-align",
-        "-Wcast-qual",
-        "-Wno-unused-parameter",
-        "-Wpointer-arith",
         "-Wsign-compare",
+        "-Wpointer-arith",
+        "-Wcast-qual",
+        "-Wcast-align",
+        "-Wno-unused-parameter",
     ] + select(soong_config_variable("minigbm", "platform"), {
         "generic": generic_cflags,
         "intel": intel_cflags,
         "meson": meson_cflags,
         "msm": msm_cflags,
-        "mt8186": mediatek_cflags + ["-DMTK_MT8186"],
-        "mt8188": mediatek_cflags + ["-DMTK_MT8188G"],
-        "mt8196": mediatek_cflags + ["-DMTK_MT8196"],
-        default: [],
+        "arcvm": arcvm_cflags,
+        default: generic_cflags,  // Default to generic with gbm_mesa
     }),
 
     product_variables: {
@@ -116,6 +119,14 @@ cc_defaults {
     },
 }
 
+cc_library_headers {
+    name: "libminigbm_headers",
+    host_supported: true,
+    vendor_available: true,
+    export_include_dirs: ["."],
+}
+
+// Alias for compatibility with external code that uses the old name
 cc_library_headers {
     name: "minigbm_headers",
     host_supported: true,
@@ -132,7 +143,7 @@ cc_defaults {
         "libhardware_headers",
         "libnativebase_headers",
         "libsystem_headers",
-        "minigbm_headers",
+        "libminigbm_headers",
     ],
 
     static_libs: ["libarect"],
@@ -144,9 +155,9 @@ cc_defaults {
         "libdmabufheap",
         "libdrm",
         "libgralloctypes",
-        "liblog",
         "libnativewindow",
         "libsync",
+        "liblog",
     ],
 }
 
@@ -158,6 +169,9 @@ cc_defaults {
         ":minigbm_core_files",
         ":minigbm_gralloc_common_files",
     ],
+
+    // Additional includes for gbm_mesa_driver
+    local_include_dirs: ["gbm_mesa_driver"],
 }
 
 cc_defaults {
@@ -173,7 +187,6 @@ cc_library {
     name: "libgbm",
     defaults: ["minigbm_defaults"],
     host_supported: true,
-    min_sdk_version: "34",
 
     srcs: [
         ":minigbm_core_files",
@@ -201,8 +214,8 @@ cc_library {
         },
     },
     apex_available: [
-        "//apex_available:anyapex",
         "//apex_available:platform",
+        "//apex_available:anyapex",
     ],
     vendor_available: true,
     product_available: true,
@@ -217,10 +230,10 @@ rust_bindgen {
     wrapper_src: "rust/gbm_wrapper.h",
     source_stem: "bindings",
     bindgen_flags: [
-        "--allowlist-function=^gbm_.*$",
-        "--allowlist-type=^gbm_.*$",
-        "--allowlist-var=GBM_.*|gbm_.*$",
         "--blocklist-type=__BINDGEN_TMP_.*",
+        "--allowlist-type=^gbm_.*$",
+        "--allowlist-function=^gbm_.*$",
+        "--allowlist-var=GBM_.*|gbm_.*$",
         "--constified-enum-module=^gbm_.*$",
     ],
     shared_libs: ["libgbm"],
@@ -255,9 +268,32 @@ cc_library_headers {
     host_supported: true,
     vendor_available: true,
     export_include_dirs: ["cros_gralloc"],
-    visibility: [
-        "//device/generic/goldfish/hals/hwc3:__subpackages__",
-    ],
+}
+
+// MSM
+cc_library_shared {
+    name: "libminigbm_gralloc_msm",
+    defaults: ["minigbm_cros_gralloc_library_defaults"],
+    cflags: msm_cflags,
+}
+
+cc_library_shared {
+    name: "gralloc.minigbm_msm",
+    defaults: ["minigbm_cros_gralloc0_defaults"],
+    shared_libs: ["libminigbm_gralloc_msm"],
+}
+
+// ARCVM
+cc_library_shared {
+    name: "libminigbm_gralloc_arcvm",
+    defaults: ["minigbm_cros_gralloc_library_defaults"],
+    cflags: arcvm_cflags,
+}
+
+cc_library_shared {
+    name: "gralloc.minigbm_arcvm",
+    defaults: ["minigbm_cros_gralloc0_defaults"],
+    shared_libs: ["libminigbm_gralloc_arcvm"],
 }
 
 // Intel
@@ -291,28 +327,28 @@ cc_library_shared {
     },
 }
 
-// Meson
+// Mediatek
 cc_library_shared {
-    name: "libminigbm_gralloc_meson",
+    name: "libminigbm_gralloc_mediatek",
     defaults: ["minigbm_cros_gralloc_library_defaults"],
-    cflags: meson_cflags,
+    cflags: ["-DDRV_MEDIATEK"],
 }
 
 cc_library_shared {
-    name: "gralloc.minigbm_meson",
+    name: "gralloc.minigbm_mediatek",
     defaults: ["minigbm_cros_gralloc0_defaults"],
-    shared_libs: ["libminigbm_gralloc_meson"],
+    shared_libs: ["libminigbm_gralloc_mediatek"],
 }
 
-// MSM
+// Virgl (for virtio-gpu with virgl renderer)
 cc_library_shared {
-    name: "libminigbm_gralloc_msm",
+    name: "libminigbm_gralloc_virgl",
     defaults: ["minigbm_cros_gralloc_library_defaults"],
-    cflags: msm_cflags,
+    cflags: ["-DVIRTIO_GPU_NEXT"],
 }
 
 cc_library_shared {
-    name: "gralloc.minigbm_msm",
+    name: "gralloc.minigbm_virgl",
     defaults: ["minigbm_cros_gralloc0_defaults"],
-    shared_libs: ["libminigbm_gralloc_msm"],
+    shared_libs: ["libminigbm_gralloc_virgl"],
 }

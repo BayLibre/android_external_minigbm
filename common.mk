@@ -9,6 +9,10 @@
 #  The authoritative common.mk is located in:
 #    https://chromium.googlesource.com/chromiumos/platform2/+/HEAD/common-mk
 #  Please make all changes there, then copy into place in other repos.
+#
+#  The copybara service is used to automatically sync updates for projects
+#  hosted on Chromium GoB hosts.  Please see:
+#  //google3/third_party/copybara-gsubtreed/chromiumos_platform2/copy.bara.sky
 # NOTE NOTE NOTE
 #
 # This file provides a common architecture for building C/C++ source trees.
@@ -312,16 +316,14 @@ endif
 #  CXXFLAGS := $(filter-out badflag,$(CXXFLAGS)) # Filter out a value
 # The same goes for CFLAGS.
 COMMON_CFLAGS-gcc := -fvisibility=internal -ggdb3 -Wa,--noexecstack
-# minigbm: Disable -Wimplicit-fallthrough to unbreak compilation.
-COMMON_CFLAGS-clang := -fvisibility=hidden -ggdb \
+COMMON_CFLAGS-clang := -fvisibility=hidden -ggdb -Wimplicit-fallthrough \
   -Wstring-plus-int
 # When a class is exported through __attribute__((visibility("default"))), we
 # still want to eliminate symbols from inline class member functions to reduce
 # symbol resolution overhead. Therefore, pass -fvisibility-inlines-hidden in
 # addition to -fvisibility=hidden. (go/cros-symbol-slimming)
-# minigbm: Disable -Wunreachable-code to unbreak compilation.
-COMMON_CFLAGS := -Wall -Wunused -Wno-unused-parameter \
-  -Wbool-operation -Wstring-compare -Wxor-used-as-pow \
+COMMON_CFLAGS := -Wall -Wunused -Wno-unused-parameter -Wunreachable-code \
+  -Wbool-operation -Wstring-compare $(call check_cc,-Wxor-used-as-pow) \
   -Wint-in-bool-context -Wfree-nonheap-object \
   -Werror -Wformat=2 -fno-strict-aliasing  \
   $(SSP_CFLAGS) -O1
