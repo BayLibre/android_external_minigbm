@@ -173,6 +173,14 @@ static int xe_add_combinations(struct driver *drv)
 	drv_modify_combination(drv, DRM_FORMAT_YVU420_ANDROID, &metadata_linear,
 			       BO_USE_CAMERA_WRITE);
 
+	/* Rendering on non HW renderable external formats is supported on formats that
+	 * can be resolved by VK_ANDROID_external_format_resolve.
+	 * Currently: NV12, P010, linear YV12
+	 */
+	for (unsigned i = 0; i < ARRAY_SIZE(external_resolve_formats); i++) {
+		drv_modify_combination(drv, external_resolve_formats[i], &metadata_linear, render);
+	}
+
 	/* Android CTS tests require this. */
 	drv_add_combination(drv, DRM_FORMAT_BGR888, &metadata_linear, BO_USE_SW_MASK);
 
@@ -202,10 +210,12 @@ static int xe_add_combinations(struct driver *drv)
 	drv_add_combinations(drv, scanout_render_formats, ARRAY_SIZE(scanout_render_formats),
 			     &metadata_x_tiled, scanout_and_render_not_linear);
 
-	const uint64_t nv12_usage =
-	    BO_USE_TEXTURE | BO_USE_HW_VIDEO_DECODER | BO_USE_SCANOUT | hw_protected;
+	/* Rendering can be supported via VK_ANDROID_external_format_resolve */
+	const uint64_t nv12_usage = BO_USE_TEXTURE | BO_USE_HW_VIDEO_DECODER | BO_USE_SCANOUT |
+				    hw_protected | render_not_linear;
 	const uint64_t p010_usage = BO_USE_TEXTURE | BO_USE_HW_VIDEO_DECODER | hw_protected |
-				    (xe->graphics_version >= 11 ? BO_USE_SCANOUT : 0);
+				    (xe->graphics_version >= 11 ? BO_USE_SCANOUT : 0) |
+				    render_not_linear;
 
 	if (xe->is_mtl_or_newer) {
 		struct format_metadata metadata_4_tiled = { .tiling = XE_TILING_4,
@@ -401,6 +411,29 @@ static int xe_init(struct driver *drv)
 	return 0;
 }
 
+static uint32_t xe_gem_create(struct bo *bo, int drv_fd, uint64_t size, uint32_t placement,
+			      uint32_t flags, uint16_t cpu_caching)
+{
+	struct drm_xe_gem_create gem_create = {
+		.vm_id = 0, /*If .vm_id == 0, it is exportable via PRIME fd */
+		.size = size,
+		.placement = placement,
+		.flags = flags,
+		.cpu_caching = cpu_caching,
+	};
+
+	int ret = drmIoctl(drv_fd, DRM_IOCTL_XE_GEM_CREATE, &gem_create);
+	if (ret) {
+		drv_loge("Xe IOCTL DRM_IOCTL_XE_GEM_CREATE, BO creation failed, aborting: %d\n ",
+			 -errno);
+		return -errno;
+	}
+
+	bo->handle.u32 = gem_create.handle;
+
+	return ret;
+}
+
 /*
  * Returns true if the height of a buffer of the given format should be aligned
  * to the largest coded unit (LCU) assuming that it will be used for video. This
@@ -487,8 +520,11 @@ static int xe_bo_compute_metadata(struct bo *bo, uint32_t width, uint32_t height
 			return -EINVAL;
 
 		if ((xe->is_mtl_or_newer) &&
-		    (use_flags == (BO_USE_SCANOUT | BO_USE_TEXTURE | BO_USE_HW_VIDEO_DECODER))) {
-			modifier = I915_FORMAT_MOD_4_TILED;
+		    ((use_flags == (BO_USE_SCANOUT | BO_USE_TEXTURE | BO_USE_HW_VIDEO_DECODER)) ||
+		     (use_flags == (BO_USE_RENDERING | BO_USE_TEXTURE | BO_USE_SCANOUT)) ||
+		     (use_flags == (BO_USE_TEXTURE | BO_USE_RENDERING)))) {
+			modifier = (xe->graphics_version >= 20) ? I915_FORMAT_MOD_4_TILED_LNL_CCS
+								: I915_FORMAT_MOD_4_TILED;
 		} else {
 			modifier = combo->metadata.modifier;
 		}
@@ -546,6 +582,7 @@ static int xe_bo_compute_metadata(struct bo *bo, uint32_t width, uint32_t height
 		bo->meta.tiling = XE_TILING_Y;
 		break;
 	case I915_FORMAT_MOD_4_TILED:
+	case I915_FORMAT_MOD_4_TILED_LNL_CCS:
 		bo->meta.tiling = XE_TILING_4;
 		break;
 	}
@@ -648,34 +685,29 @@ static int xe_bo_compute_metadata(struct bo *bo, uint32_t width, uint32_t height
 
 static int xe_bo_create_from_metadata(struct bo *bo)
 {
-	int ret;
-
+	int drv_fd = bo->drv->fd;
 	uint32_t flags = 0;
 	uint32_t cpu_caching;
+	size_t bo_size = bo->meta.total_size;
+	uint32_t gem_placement = 0;
+
+	/* All compressed BOs must be WC cached as per spec */
 	if (bo->meta.use_flags & BO_USE_SCANOUT) {
 		flags |= DRM_XE_GEM_CREATE_FLAG_SCANOUT;
+		cpu_caching = DRM_XE_GEM_CPU_CACHING_WC;
+	} else if (bo->meta.format_modifier == I915_FORMAT_MOD_4_TILED_LNL_CCS) {
 		cpu_caching = DRM_XE_GEM_CPU_CACHING_WC;
 	} else {
 		cpu_caching = DRM_XE_GEM_CPU_CACHING_WB;
 	}
 
-	struct drm_xe_gem_create gem_create = {
-		.vm_id = 0, /* ensure exportable to PRIME fd */
-		.size = bo->meta.total_size,
-		.flags = flags,
-		.cpu_caching = cpu_caching,
-	};
-
 	/* FIXME: let's assume iGPU with SYSMEM is only supported */
-	gem_create.placement |= BITFIELD_BIT(DRM_XE_MEM_REGION_CLASS_SYSMEM);
+	gem_placement |= BITFIELD_BIT(DRM_XE_MEM_REGION_CLASS_SYSMEM);
 
-	ret = drmIoctl(bo->drv->fd, DRM_IOCTL_XE_GEM_CREATE, &gem_create);
-	if (ret)
-		return -errno;
+	/* Create and allocate BO in GPU memory */
+	int ret = xe_gem_create(bo, drv_fd, bo_size, gem_placement, flags, cpu_caching);
 
-	bo->handle.u32 = gem_create.handle;
-
-	return 0;
+	return ret;
 }
 
 static void xe_close(struct driver *drv)
@@ -715,7 +747,8 @@ static void *xe_bo_map(struct bo *bo, struct vma *vma, uint32_t map_flags)
 	}
 
 	if (addr == MAP_FAILED) {
-		drv_loge("xe GEM mmap failed\n");
+		drv_loge("Xe GEM mmap failed with error(%d)\n", errno);
+
 		return addr;
 	}
 
@@ -764,6 +797,7 @@ const struct backend backend_xe = {
 	.bo_unmap = drv_bo_munmap,
 	.num_planes_from_modifier = xe_num_planes_from_modifier,
 	.bo_import = xe_bo_import,
+	.bo_export = drv_prime_bo_export,
 	.bo_flush = xe_bo_flush,
 	.resolve_format_and_use_flags = drv_resolve_format_and_use_flags_helper,
 };

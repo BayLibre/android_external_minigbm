@@ -48,9 +48,8 @@ static const uint32_t dumb_texture_source_formats[] = {
 };
 
 static const uint32_t texture_source_formats[] = {
-	DRM_FORMAT_NV12,	DRM_FORMAT_NV21,	 DRM_FORMAT_R8,
-	DRM_FORMAT_R16,	        DRM_FORMAT_RG88,	 DRM_FORMAT_YVU420_ANDROID,
-	DRM_FORMAT_ABGR2101010, DRM_FORMAT_ABGR16161616F
+	DRM_FORMAT_NV21,	   DRM_FORMAT_R8,	   DRM_FORMAT_R16,	    DRM_FORMAT_RG88,
+	DRM_FORMAT_YVU420_ANDROID, DRM_FORMAT_ABGR2101010, DRM_FORMAT_ABGR16161616F
 };
 
 static const uint32_t depth_stencil_formats[] = { DRM_FORMAT_DEPTH16, DRM_FORMAT_DEPTH24,
@@ -1389,6 +1388,7 @@ const struct backend virtgpu_virgl = { .name = "virtgpu_virgl",
 				       .bo_create_with_modifiers = virgl_bo_create_with_modifiers,
 				       .bo_destroy = virgl_bo_destroy,
 				       .bo_import = drv_prime_bo_import,
+				       .bo_export = drv_prime_bo_export,
 				       .bo_map = virgl_bo_map,
 				       .bo_unmap = drv_bo_munmap,
 				       .bo_invalidate = virgl_bo_invalidate,

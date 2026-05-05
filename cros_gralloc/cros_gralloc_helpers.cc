@@ -21,12 +21,6 @@
 /* Define to match AIDL PixelFormat::R_8. */
 #define HAL_PIXEL_FORMAT_R8 0x38
 
-/* New formats from hardware/interfaces/graphics/common/aidl/android/hardware/graphics/common/PixelFormat.aidl */
-#define HAL_PIXEL_FORMAT_R16_UINT 57
-#define HAL_PIXEL_FORMAT_R16G16_UINT 58
-#define HAL_PIXEL_FORMAT_RGBA_10101010 59
-
-
 uint32_t cros_gralloc_convert_format(int format)
 {
 	/*
@@ -94,14 +88,6 @@ uint32_t cros_gralloc_convert_format(int format)
 		return DRM_FORMAT_DEPTH32;
 	case HAL_PIXEL_FORMAT_DEPTH_32F_STENCIL_8:
 		return DRM_FORMAT_DEPTH32_STENCIL8;
-#if ANDROID_API_LEVEL >= 34
-	case HAL_PIXEL_FORMAT_R16_UINT:
-		return DRM_FORMAT_R16;
-	case HAL_PIXEL_FORMAT_R16G16_UINT:
-		return DRM_FORMAT_GR1616;
-	case HAL_PIXEL_FORMAT_RGBA_10101010:
-		return DRM_FORMAT_AXBXGXRX106106106106;
-#endif
 	}
 
 	return DRM_FORMAT_NONE;
@@ -143,11 +129,12 @@ uint64_t cros_gralloc_convert_usage(uint64_t usage)
 
 #if ANDROID_API_LEVEL >= 35
 	handle_usage(&usage, GRALLOC_USAGE_PROTECTED, &use_flags, BO_USE_PROTECTED);
-#else
-	handle_usage(&usage, GRALLOC_USAGE_PROTECTED, &use_flags, BO_USE_LINEAR);
-#endif
-
 	handle_usage(&usage, GRALLOC_USAGE_CURSOR, &use_flags, BO_USE_CURSOR);
+#else
+	/* Legacy behavior to maintain backwards compatibility. */
+	handle_usage(&usage, GRALLOC_USAGE_PROTECTED, &use_flags, BO_USE_LINEAR);
+	handle_usage(&usage, GRALLOC_USAGE_CURSOR, &use_flags, BO_USE_NONE);
+#endif
 	/* HACK: See b/30054495 for BO_USE_SW_READ_OFTEN. */
 	handle_usage(&usage, GRALLOC_USAGE_HW_VIDEO_ENCODER, &use_flags,
 		     BO_USE_HW_VIDEO_ENCODER | BO_USE_SW_READ_OFTEN);
@@ -178,6 +165,12 @@ uint32_t cros_gralloc_convert_map_usage(uint64_t usage)
 		map_flags |= BO_MAP_READ;
 	if (usage & GRALLOC_USAGE_SW_WRITE_MASK)
 		map_flags |= BO_MAP_WRITE;
+
+	/* Camera HAL needs CPU access for YUV buffer processing */
+	if (usage & GRALLOC_USAGE_HW_CAMERA_WRITE)
+		map_flags |= BO_MAP_WRITE;
+	if (usage & GRALLOC_USAGE_HW_CAMERA_READ)
+		map_flags |= BO_MAP_READ;
 
 	return map_flags;
 }

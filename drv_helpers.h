@@ -7,10 +7,6 @@
 #ifndef DRV_HELPERS_H
 #define DRV_HELPERS_H
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 #include <stdbool.h>
 
 #include "drv.h"
@@ -21,6 +17,8 @@ extern "C" {
 #endif
 
 struct format_metadata;
+
+extern const struct backend backend_dma_heap;
 
 uint32_t drv_height_from_format(uint32_t format, uint32_t height, size_t plane);
 uint32_t drv_vertical_subsampling_from_format(uint32_t format, size_t plane);
@@ -38,6 +36,7 @@ int drv_dumb_bo_destroy(struct bo *bo);
 int drv_gem_close(struct driver *drv, uint32_t gem_handle);
 int drv_gem_bo_destroy(struct bo *bo);
 int drv_prime_bo_import(struct bo *bo, struct drv_import_fd_data *data);
+int drv_prime_bo_export(struct bo *bo, size_t plane);
 void *drv_dumb_bo_map(struct bo *bo, struct vma *vma, uint32_t map_flags);
 int drv_bo_munmap(struct bo *bo, struct vma *vma);
 int drv_get_prot(uint32_t map_flags);
@@ -75,9 +74,5 @@ struct lru_entry *lru_find(struct lru *lru, bool (*eq)(struct lru_entry *e, void
 			   void *data);
 void lru_insert(struct lru *lru, struct lru_entry *entry);
 void lru_init(struct lru *lru, int max);
-
-#ifdef __cplusplus
-}
-#endif
 
 #endif

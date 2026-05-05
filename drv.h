@@ -16,6 +16,9 @@ extern "C" {
 #include <stdint.h>
 #include <stdlib.h>
 
+#define DRV_GBM_MESA_DRIVER (-2)
+#define DRV_DMAHEAPS_DRIVER (-3)
+
 #define DRV_MAX_PLANES 4
 
 // clang-format off
@@ -106,17 +109,39 @@ extern "C" {
 #define I915_FORMAT_MOD_4_TILED_MTL_RC_CCS fourcc_mod_code(INTEL, 13)
 #endif
 
+#ifndef I915_FORMAT_MOD_4_TILED_LNL_CCS
+//TODO: remove this definition once drm_fourcc.h contains it.
+/*
+ * Intel Color Control Surfaces (CCS) for graphics ver. 20 unified compression
+ * on integrated graphics
+ *
+ * The main surface is Tile 4 and at plane index 0. For semi-planar formats
+ * like NV12, the Y and UV planes are Tile 4 and are located at plane indices
+ * 0 and 1, respectively. The CCS for all planes are stored outside of the
+ * GEM object in a reserved memory area dedicated for the storage of the
+ * CCS data for all compressible GEM objects.
+ */
+#define I915_FORMAT_MOD_4_TILED_LNL_CCS fourcc_mod_code(INTEL, 16)
+#endif
+
 // clang-format on
+struct backend;
 struct driver;
 struct bo;
 struct combination;
 
+/* Most backends use u32 (GEM handle). dma-heap backend uses fd (dma-buf).
+ *
+ * Note that drv.c assumes u32 in a few places. ptr/s64/u64 must not be used
+ * unless drv.c is fixed first.
+ */
 union bo_handle {
 	void *ptr;
 	int32_t s32;
 	uint32_t u32;
 	int64_t s64;
 	uint64_t u64;
+	int fd;
 };
 
 struct drv_import_fd_data {
@@ -156,7 +181,7 @@ struct mapping {
 
 void drv_preload(bool load);
 
-struct driver *drv_create(int fd);
+struct driver *drv_create(int fd, const struct backend *backend);
 
 void drv_destroy(struct driver *drv);
 

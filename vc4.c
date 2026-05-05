@@ -127,6 +127,7 @@ const struct backend backend_vc4 = {
 	.bo_create = vc4_bo_create,
 	.bo_create_with_modifiers = vc4_bo_create_with_modifiers,
 	.bo_import = drv_prime_bo_import,
+	.bo_export = drv_prime_bo_export,
 	.bo_destroy = drv_gem_bo_destroy,
 	.bo_map = vc4_bo_map,
 	.bo_unmap = drv_bo_munmap,

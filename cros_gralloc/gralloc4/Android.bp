@@ -14,12 +14,6 @@
 // limitations under the License.
 
 package {
-    // See: http://go/android-license-faq
-    // A large-scale-change added 'default_applicable_licenses' to import
-    // all of the 'license_kinds' from "external_minigbm_license"
-    // to get the below license kinds:
-    //   SPDX-license-identifier-Apache-2.0
-    //   SPDX-license-identifier-BSD
     default_applicable_licenses: ["external_minigbm_license"],
 }
 
@@ -102,6 +96,14 @@ cc_binary {
 }
 
 cc_binary {
+    name: "android.hardware.graphics.allocator@4.0-service.minigbm_arcvm",
+    defaults: ["minigbm_gralloc4_allocator_defaults"],
+    shared_libs: ["libminigbm_gralloc_arcvm"],
+    vintf_fragment_modules: ["android.hardware.graphics.allocator@4.0.xml"],
+    init_rc: ["android.hardware.graphics.allocator@4.0-service.minigbm_arcvm.rc"],
+}
+
+cc_binary {
     name: "android.hardware.graphics.allocator@4.0-service.minigbm_intel",
     defaults: ["minigbm_gralloc4_allocator_defaults"],
     shared_libs: ["libminigbm_gralloc_intel"],
@@ -116,6 +118,14 @@ cc_binary {
             enabled: true,
         },
     },
+}
+
+cc_binary {
+    name: "android.hardware.graphics.allocator@4.0-service.minigbm_mediatek",
+    defaults: ["minigbm_gralloc4_allocator_defaults"],
+    shared_libs: ["libminigbm_gralloc_mediatek"],
+    vintf_fragment_modules: ["android.hardware.graphics.allocator@4.0.xml"],
+    init_rc: ["android.hardware.graphics.allocator@4.0-service.minigbm_mediatek.rc"],
 }
 
 vintf_fragment {
@@ -141,6 +151,14 @@ cc_library_shared {
 }
 
 cc_library_shared {
+    name: "android.hardware.graphics.mapper@4.0-impl.minigbm_arcvm",
+    defaults: ["minigbm_gralloc4_common_defaults"],
+    shared_libs: ["libminigbm_gralloc_arcvm"],
+    vintf_fragment_modules: ["android.hardware.graphics.mapper@4.0.xml"],
+    srcs: [":minigbm_gralloc4_mapper_files"],
+}
+
+cc_library_shared {
     name: "android.hardware.graphics.mapper@4.0-impl.minigbm_intel",
     defaults: ["minigbm_gralloc4_common_defaults"],
     shared_libs: ["libminigbm_gralloc_intel"],
@@ -155,4 +173,12 @@ cc_library_shared {
             enabled: true,
         },
     },
+}
+
+cc_library_shared {
+    name: "android.hardware.graphics.mapper@4.0-impl.minigbm_mediatek",
+    defaults: ["minigbm_gralloc4_common_defaults"],
+    shared_libs: ["libminigbm_gralloc_mediatek"],
+    vintf_fragment_modules: ["android.hardware.graphics.mapper@4.0.xml"],
+    srcs: [":minigbm_gralloc4_mapper_files"],
 }

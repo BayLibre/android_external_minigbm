@@ -14,8 +14,6 @@
 #include <syscall.h>
 #include <xf86drm.h>
 
-#include "../drv_helpers.h"
-#include "../drv_priv.h"
 #include "../util.h"
 #include "cros_gralloc_buffer_metadata.h"
 
@@ -94,6 +92,7 @@ std::shared_ptr<cros_gralloc_driver> cros_gralloc_driver::get_instance()
 	return s_instance;
 }
 
+#ifndef DRV_EXTERNAL
 static struct driver *init_try_node(int idx, char const *str)
 {
 	int fd;
@@ -109,7 +108,7 @@ static struct driver *init_try_node(int idx, char const *str)
 	if (fd < 0)
 		return NULL;
 
-	drv = drv_create(fd);
+	drv = drv_create(fd, NULL);
 	if (!drv)
 		close(fd);
 
@@ -134,6 +133,27 @@ static struct driver *init_try_nodes()
 	uint32_t min_card_node = DRM_CARD_NODE_START;
 	uint32_t max_card_node = (min_card_node + num_nodes);
 
+	char backend_name[PROPERTY_VALUE_MAX];
+	property_get("vendor.gralloc.minigbm.backend", backend_name, "auto");
+
+	if (strcmp(backend_name, "dmaheaps") == 0) {
+		ALOGI("Initializing dma-buf heaps backend");
+		drv = drv_create(DRV_DMAHEAPS_DRIVER, nullptr);
+		if (drv)
+			return drv;
+
+		ALOGE("Failed to initialize dma-buf heap backend.");
+	}
+
+	if (strcmp(backend_name, "gbm_mesa") == 0) {
+		ALOGI("Initializing gbm_mesa backend");
+		drv = drv_create(DRV_GBM_MESA_DRIVER, nullptr);
+		if (drv)
+			return drv;
+
+		ALOGE("Failed to initialize gbm_mesa backend.");
+	}
+
 	// Try render nodes...
 	for (uint32_t i = min_render_node; i < max_render_node; i++) {
 		drv = init_try_node(i, render_nodes_fmt);
@@ -148,27 +168,37 @@ static struct driver *init_try_nodes()
 			return drv;
 	}
 
+	/* Fallback to gbm_mesa which is way smarter than dumb_driver */
+	if (strcmp(backend_name, "gbm_mesa") != 0) {
+		ALOGI("Falling back to gbm_mesa backend");
+		drv = drv_create(DRV_GBM_MESA_DRIVER, nullptr);
+		if (drv)
+			return drv;
+	}
+
+	ALOGE("Failed to find suitable backend");
+
 	return nullptr;
 }
+
+#else
+
+static struct driver *init_try_nodes()
+{
+	return drv_create(-1);
+}
+
+#endif
 
 static void drv_destroy_and_close(struct driver *drv)
 {
 	int fd = drv_get_fd(drv);
 	drv_destroy(drv);
-	close(fd);
+	if (fd != -1)
+		close(fd);
 }
 
-static bool is_running_with_software_rendering()
-{
-	const char *vulkan_driver = drv_get_os_option("ro.hardware.vulkan");
-	if (!vulkan_driver)
-		vulkan_driver = drv_get_os_option("ro.board.platform");
-	return (vulkan_driver != nullptr && strstr(vulkan_driver, "pastel") != nullptr);
-}
-
-cros_gralloc_driver::cros_gralloc_driver()
-    : drv_(init_try_nodes(), drv_destroy_and_close),
-      is_running_with_software_rendering_(is_running_with_software_rendering())
+cros_gralloc_driver::cros_gralloc_driver() : drv_(init_try_nodes(), drv_destroy_and_close)
 {
 }
 
@@ -190,11 +220,6 @@ bool cros_gralloc_driver::get_resolved_format_and_use_flags(
 	uint32_t resolved_format;
 	uint64_t resolved_use_flags;
 	struct combination *combo;
-
-	uint64_t use_flags = descriptor->use_flags;
-	if (is_running_with_software_rendering_ && (use_flags & BO_USE_GPU_HW) != 0) {
-		use_flags |= (BO_USE_SW_READ_OFTEN | BO_USE_SW_WRITE_OFTEN);
-	}
 
 	drv_resolve_format_and_use_flags(drv_.get(), descriptor->drm_format, descriptor->use_flags,
 					 &resolved_format, &resolved_use_flags);
@@ -310,11 +335,9 @@ int32_t cros_gralloc_driver::allocate(const struct cros_gralloc_buffer_descripto
 	}
 
 	hnd->reserved_region_size = 0;
-	if (descriptor->enable_metadata_fd)
+	if (descriptor->enable_metadata_fd) {
 		hnd->reserved_region_size =
 		    sizeof(struct cros_gralloc_buffer_metadata) + descriptor->client_metadata_size;
-
-	if (hnd->reserved_region_size > 0) {
 		ret = create_reserved_region(descriptor->name, hnd->reserved_region_size);
 		if (ret < 0)
 			goto destroy_hnd;
@@ -344,10 +367,12 @@ int32_t cros_gralloc_driver::allocate(const struct cros_gralloc_buffer_descripto
 		goto destroy_hnd;
 	}
 
-	ret = buffer->initialize_metadata(descriptor);
-	if (ret) {
-		ALOGE("Failed to allocate: failed to initialize cros_gralloc_buffer metadata.");
-		goto destroy_hnd;
+	if (descriptor->enable_metadata_fd) {
+		ret = buffer->initialize_metadata(descriptor);
+		if (ret) {
+			ALOGE("Failed to allocate: failed to initialize cros_gralloc_buffer metadata.");
+			goto destroy_hnd;
+		}
 	}
 
 	{
@@ -368,7 +393,10 @@ destroy_hnd:
 	native_handle_close(hnd);
 	native_handle_delete(hnd);
 
-	drv_bo_destroy(bo);
+	// cros_gralloc_buffer takes the bo ownership when cros_gralloc_buffer::create succeeds
+	if (!buffer)
+		drv_bo_destroy(bo);
+
 	return ret;
 }
 
@@ -484,15 +512,6 @@ int32_t cros_gralloc_driver::lock(buffer_handle_t handle, int32_t acquire_fence,
 	if (!hnd) {
 		ALOGE("Invalid handle.");
 		return -EINVAL;
-	}
-
-	if (!is_running_with_software_rendering_) {
-		if ((hnd->usage & (GRALLOC_USAGE_SW_READ_MASK | GRALLOC_USAGE_SW_WRITE_MASK)) ==
-		    0) {
-			ALOGE("Attempted to lock() a buffer that was not allocated with a "
-			      "BufferUsage::CPU_* usage.");
-			return -EINVAL;
-		}
 	}
 
 	auto buffer = get_buffer(hnd);

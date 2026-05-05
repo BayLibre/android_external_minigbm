@@ -11,6 +11,10 @@
 #include <cutils/native_handle.h>
 #include <hardware/gralloc.h>
 #include <memory.h>
+#ifndef HAS_NO_AIDL_METADATA
+#include <aidl/android/hardware/graphics/common/ChromaSiting.h>
+#include <aidl/android/hardware/graphics/common/Dataspace.h>
+#endif // HAS_NO_AIDL_METADATA
 
 struct gralloc0_module {
 	gralloc_module_t base;
@@ -29,6 +33,11 @@ struct cros_gralloc0_buffer_info {
 	uint32_t stride[4];
 };
 
+struct cros_gralloc0_buffer_color_info {
+	int32_t dataspace;
+	int32_t chroma_siting;
+};
+
 /* This enumeration must match the one in <gralloc_drm.h>.
  * The functions supported by this gralloc's temporary private API are listed
  * below. Use of these functions is highly discouraged and should only be
@@ -43,6 +52,7 @@ enum {
 	GRALLOC_DRM_GET_BACKING_STORE,
 	GRALLOC_DRM_GET_BUFFER_INFO,
 	GRALLOC_DRM_GET_USAGE,
+	GRALLOC_DRM_GET_BUFFER_COLOR_INFO,
 };
 
 /* This enumeration corresponds to the GRALLOC_DRM_GET_USAGE query op, which
@@ -249,6 +259,7 @@ static int gralloc0_perform(struct gralloc_module_t const *module, int op, ...)
 	uint32_t offsets[DRV_MAX_PLANES] = { 0, 0, 0, 0 };
 	uint64_t format_modifier = 0;
 	struct cros_gralloc0_buffer_info *info;
+	struct cros_gralloc0_buffer_color_info *color_info;
 	auto const_module = reinterpret_cast<const struct gralloc0_module *>(module);
 	auto mod = const_cast<struct gralloc0_module *>(const_module);
 	uint32_t req_usage;
@@ -268,6 +279,7 @@ static int gralloc0_perform(struct gralloc_module_t const *module, int op, ...)
 	case GRALLOC_DRM_GET_DIMENSIONS:
 	case GRALLOC_DRM_GET_BACKING_STORE:
 	case GRALLOC_DRM_GET_BUFFER_INFO:
+	case GRALLOC_DRM_GET_BUFFER_COLOR_INFO:
 		/* retrieve handles for ops with buffer_handle_t */
 		handle = va_arg(args, buffer_handle_t);
 		if (!handle) {
@@ -345,6 +357,22 @@ static int gralloc0_perform(struct gralloc_module_t const *module, int op, ...)
 		if (req_usage & GRALLOC_DRM_GET_USAGE_FRONT_RENDERING_BIT)
 			gralloc_usage |= BUFFER_USAGE_FRONT_RENDERING;
 		*out_gralloc_usage = gralloc_usage;
+		break;
+	case GRALLOC_DRM_GET_BUFFER_COLOR_INFO:
+#ifndef HAS_NO_AIDL_METADATA
+		color_info = va_arg(args, struct cros_gralloc0_buffer_color_info *);
+		mod->driver->with_buffer(hnd, [&](cros_gralloc_buffer *buffer) {
+			std::optional<aidl::android::hardware::graphics::common::Dataspace> dataspace;
+			ret = buffer->get_dataspace(&dataspace);
+			if (!ret)
+				color_info->dataspace = static_cast<int32_t>(dataspace.value());
+		});
+		color_info->chroma_siting =
+			static_cast<int32_t>(aidl::android::hardware::graphics::common::ChromaSiting::NONE);
+#else
+		(void)color_info;
+		ret = -EINVAL;
+#endif // HAS_NO_AIDL_METADATA
 		break;
 	default:
 		ret = -EINVAL;
@@ -468,23 +496,22 @@ static int gralloc0_lock_async_ycbcr(struct gralloc_module_t const *module, buff
 	if (ret)
 		return ret;
 
-	if (!map_flags) {
-		ret = mod->driver->resource_info(handle, strides, offsets, &format_modifier);
-		if (ret)
-			return ret;
+	ret = mod->driver->resource_info(handle, strides, offsets, &format_modifier);
+	if (ret)
+		return ret;
 
-		for (uint32_t plane = 0; plane < DRV_MAX_PLANES; plane++)
-			addr[plane] =
-			    reinterpret_cast<uint8_t *>(static_cast<uintptr_t>(offsets[plane]));
-	}
+	/* Apply offsets to the base mapped address for each plane */
+	uint8_t *base_addr = addr[0];
+	for (uint32_t plane = 0; plane < DRV_MAX_PLANES; plane++)
+		addr[plane] = base_addr + offsets[plane];
 
 	switch (hnd->format) {
 	case DRM_FORMAT_NV12:
 		ycbcr->y = addr[0];
 		ycbcr->cb = addr[1];
 		ycbcr->cr = addr[1] + 1;
-		ycbcr->ystride = (!map_flags) ? strides[0] : hnd->strides[0];
-		ycbcr->cstride = (!map_flags) ? strides[1] : hnd->strides[1];
+		ycbcr->ystride = strides[0];
+		ycbcr->cstride = strides[1];
 		ycbcr->chroma_step = 2;
 		break;
 	case DRM_FORMAT_YVU420:
@@ -492,8 +519,8 @@ static int gralloc0_lock_async_ycbcr(struct gralloc_module_t const *module, buff
 		ycbcr->y = addr[0];
 		ycbcr->cb = addr[2];
 		ycbcr->cr = addr[1];
-		ycbcr->ystride = (!map_flags) ? strides[0] : hnd->strides[0];
-		ycbcr->cstride = (!map_flags) ? strides[1] : hnd->strides[1];
+		ycbcr->ystride = strides[0];
+		ycbcr->cstride = strides[1];
 		ycbcr->chroma_step = 1;
 		break;
 	default:
@@ -531,8 +558,6 @@ struct gralloc0_module HAL_MODULE_INFO_SYM = {
 		.lockAsync = gralloc0_lock_async,
 		.unlockAsync = gralloc0_unlock_async,
 		.lockAsync_ycbcr = gralloc0_lock_async_ycbcr,
-                .validateBufferSize = NULL,
-                .getTransportSize = NULL,
 	    },
 
 	.alloc = nullptr,
