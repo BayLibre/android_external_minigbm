@@ -133,6 +133,29 @@ static struct driver *init_try_nodes()
 	uint32_t max_render_node = (min_render_node + num_nodes);
 	uint32_t min_card_node = DRM_CARD_NODE_START;
 	uint32_t max_card_node = (min_card_node + num_nodes);
+	char backend_name[PROPERTY_VALUE_MAX];
+
+	property_get("vendor.gralloc.minigbm.backend", backend_name, "auto");
+
+	if (strcmp(backend_name, "dmaheaps") == 0) {
+		ALOGI("Initializing dma-buf heaps backend");
+		drv = drv_create(DRV_DMAHEAPS_DRIVER, nullptr);
+		if (drv)
+			return drv;
+
+		ALOGE("Failed to initialize dma-buf heap backend.");
+	}
+
+#ifdef DRV_GBM_MESA
+	if (strcmp(backend_name, "gbm_mesa") == 0) {
+		ALOGI("Initializing gbm_mesa backend");
+		drv = drv_create(DRV_GBM_MESA_DRIVER, nullptr);
+		if (drv)
+			return drv;
+
+		ALOGE("Failed to initialize gbm_mesa backend.");
+	}
+#endif
 
 	// Try render nodes...
 	for (uint32_t i = min_render_node; i < max_render_node; i++) {
@@ -148,6 +171,18 @@ static struct driver *init_try_nodes()
 			return drv;
 	}
 
+#ifdef DRV_GBM_MESA
+	/* Fallback to gbm_mesa which is way smarter than dumb_driver */
+	if (strcmp(backend_name, "gbm_mesa") != 0) {
+		ALOGI("Falling back to gbm_mesa backend");
+		drv = drv_create(DRV_GBM_MESA_DRIVER, nullptr);
+		if (drv)
+			return drv;
+	}
+#endif
+
+	ALOGE("Failed to find suitable backend");
+
 	return nullptr;
 }
 
@@ -155,7 +190,9 @@ static void drv_destroy_and_close(struct driver *drv)
 {
 	int fd = drv_get_fd(drv);
 	drv_destroy(drv);
-	close(fd);
+	/* Pseudo file descriptors (DRV_*_DRIVER) are not real fds. */
+	if (fd >= 0)
+		close(fd);
 }
 
 static bool is_running_with_software_rendering()

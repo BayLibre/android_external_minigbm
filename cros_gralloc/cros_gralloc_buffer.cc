@@ -358,7 +358,8 @@ int32_t cros_gralloc_buffer::lock(const struct rectangle *rect, uint32_t map_fla
 	memset(addr, 0, DRV_MAX_PLANES * sizeof(*addr));
 
 	if (map_flags) {
-		if (lock_data_[0]) {
+		if (lock_data_[0] && lock_data_[0]->vma->addr) {
+			/* Reuse existing valid mapping */
 			drv_bo_invalidate(bo_, lock_data_[0]);
 			vaddr = lock_data_[0]->vma->addr;
 		} else {

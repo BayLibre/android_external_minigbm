@@ -16,6 +16,13 @@ extern "C" {
 #include <stdint.h>
 #include <stdlib.h>
 
+/*
+ * Pseudo file descriptors passed to drv_create() to select a backend that is
+ * not bound to a DRM node.
+ */
+#define DRV_GBM_MESA_DRIVER (-2)
+#define DRV_DMAHEAPS_DRIVER (-3)
+
 #define DRV_MAX_PLANES 4
 
 // clang-format off

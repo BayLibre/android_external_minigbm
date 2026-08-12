@@ -70,6 +70,18 @@ filegroup {
     srcs: ["cros_gralloc/gralloc0/gralloc0.cc"],
 }
 
+// Backend delegating allocation to a Mesa-built libgbm. Only pulled in by the
+// gralloc variants that enable -DDRV_GBM_MESA; libgbm must not link it, as it
+// would drag in libgbm_mesa_wrapper.
+filegroup {
+    name: "minigbm_gbm_mesa_files",
+
+    srcs: [
+        "gbm_mesa_driver/gbm_mesa_driver.cpp",
+        "gbm_mesa_driver/gbm_mesa_internals.cpp",
+    ],
+}
+
 generic_cflags = ["-DHAS_DMABUF_SYSTEM_HEAP"]
 intel_cflags = [
     "-DDRV_I915",
@@ -243,7 +255,9 @@ rust_bindgen {
 cc_library_shared {
     name: "libminigbm_gralloc",
     defaults: ["minigbm_cros_gralloc_library_defaults"],
-    cflags: generic_cflags,
+    cflags: generic_cflags + ["-DDRV_GBM_MESA"],
+    srcs: [":minigbm_gbm_mesa_files"],
+    local_include_dirs: ["gbm_mesa_driver"],
 }
 
 cc_library_shared {

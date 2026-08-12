@@ -43,6 +43,9 @@ extern const struct backend backend_msm;
 #ifdef DRV_VC4
 extern const struct backend backend_vc4;
 #endif
+#ifdef DRV_GBM_MESA
+extern const struct backend gbm_mesa_backend;
+#endif
 
 // Dumb / generic drivers
 extern const struct backend backend_evdi;
@@ -58,6 +61,8 @@ extern const struct backend backend_synaptics;
 extern const struct backend backend_virtgpu;
 extern const struct backend backend_udl;
 extern const struct backend backend_vkms;
+extern const struct backend backend_spacemit;
+extern const struct backend backend_pvr;
 
 extern const struct backend backend_mock;
 
@@ -80,7 +85,7 @@ static const struct backend *drv_backend_list[] = {
 	&backend_evdi,	    &backend_komeda,	&backend_marvell, &backend_mediatek,
 	&backend_meson,	    &backend_nouveau,	&backend_radeon,  &backend_rockchip,
 	&backend_sun4i_drm, &backend_synaptics, &backend_udl,	  &backend_virtgpu,
-	&backend_vkms,	    &backend_mock
+	&backend_vkms,	    &backend_spacemit,	&backend_pvr,	  &backend_mock
 };
 
 void drv_preload(bool load)
@@ -132,7 +137,16 @@ struct driver *drv_create(int fd, const struct backend *backend)
 	drv->log_bos = (minigbm_debug && strstr(minigbm_debug, "log_bos") != NULL);
 
 	drv->fd = fd;
-	drv->backend = backend ? backend : drv_get_backend(fd);
+	if (backend)
+		drv->backend = backend;
+	else if (fd == DRV_DMAHEAPS_DRIVER)
+		drv->backend = &backend_dma_heap;
+#ifdef DRV_GBM_MESA
+	else if (fd == DRV_GBM_MESA_DRIVER)
+		drv->backend = &gbm_mesa_backend;
+#endif
+	else
+		drv->backend = drv_get_backend(fd);
 
 	if (!drv->backend)
 		goto free_driver;
@@ -524,6 +538,10 @@ void *drv_bo_map(struct bo *bo, const struct rectangle *rect, uint32_t map_flags
 		    rect->width != prior->rect.width || rect->height != prior->rect.height)
 			continue;
 
+		/* Skip invalid mappings with null address */
+		if (!prior->vma->addr)
+			continue;
+
 		prior->refcount++;
 		*map_data = prior;
 		goto exact_match;
@@ -532,6 +550,10 @@ void *drv_bo_map(struct bo *bo, const struct rectangle *rect, uint32_t map_flags
 	for (i = 0; i < drv_array_size(drv->mappings); i++) {
 		struct mapping *prior = (struct mapping *)drv_array_at_idx(drv->mappings, i);
 		if (prior->vma->handle != bo->handle.u32 || prior->vma->map_flags != map_flags)
+			continue;
+
+		/* Skip invalid mappings with null address */
+		if (!prior->vma->addr)
 			continue;
 
 		prior->vma->refcount++;
