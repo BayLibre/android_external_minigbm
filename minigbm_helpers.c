@@ -194,6 +194,8 @@ static int detect_device_info(unsigned int detect_flags, int fd, struct gbm_devi
 		info->dev_type_flags |= GBM_DEV_TYPE_FLAG_3D | GBM_DEV_TYPE_FLAG_ARMSOC;
 	} else if (strncmp("pvr", version->name, version->name_len) == 0) {
 		info->dev_type_flags |= GBM_DEV_TYPE_FLAG_3D | GBM_DEV_TYPE_FLAG_ARMSOC;
+	} else if (strncmp("powervr", version->name, version->name_len) == 0) {
+		info->dev_type_flags |= GBM_DEV_TYPE_FLAG_3D | GBM_DEV_TYPE_FLAG_ARMSOC;
 	} else if (strncmp("v3d", version->name, version->name_len) == 0) {
 		info->dev_type_flags |= GBM_DEV_TYPE_FLAG_3D | GBM_DEV_TYPE_FLAG_ARMSOC;
 	} else if (strncmp("vgem", version->name, version->name_len) == 0) {
