@@ -180,6 +180,12 @@ uint32_t cros_gralloc_convert_map_usage(uint64_t usage)
 	if (usage & GRALLOC_USAGE_SW_WRITE_MASK)
 		map_flags |= BO_MAP_WRITE;
 
+	/* Camera HAL needs CPU access for YUV buffer processing */
+	if (usage & GRALLOC_USAGE_HW_CAMERA_WRITE)
+		map_flags |= BO_MAP_WRITE;
+	if (usage & GRALLOC_USAGE_HW_CAMERA_READ)
+		map_flags |= BO_MAP_READ;
+
 	return map_flags;
 }
 
