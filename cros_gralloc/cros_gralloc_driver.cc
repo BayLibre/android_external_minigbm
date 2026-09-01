@@ -110,8 +110,15 @@ static struct driver *init_try_node(int idx, char const *str)
 		return NULL;
 
 	drv = drv_create(fd, NULL);
+
+	// If drv_create failed, close the fd. Otherwise, DRM master might
+	// be taken by accident on a primary node even if not needed for
+	// buffer allocation. Drop it so that programs that actually need
+	// DRM master (the real compositor) won't be locked out.
 	if (!drv)
 		close(fd);
+	else if (drmIsMaster(fd))
+		drmDropMaster(fd);
 
 	return drv;
 }
