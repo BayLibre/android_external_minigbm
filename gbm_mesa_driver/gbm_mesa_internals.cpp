@@ -195,7 +195,8 @@ struct GbmMesaDriver {
 };
 
 struct GbmMesaDriverPriv {
-	std::shared_ptr<GbmMesaDriver> gbm_mesa_drv;
+	std::shared_ptr<GbmMesaDriver> gbm_mesa_drv_alloc;
+	std::shared_ptr<GbmMesaDriver> gbm_mesa_drv_mapper;
 };
 
 /*
@@ -293,10 +294,15 @@ static bool is_separate_dc_gpu(UniqueFd *out_gpu_fd)
 static std::shared_ptr<GbmMesaDriver> gbm_mesa_get_or_init_driver(struct driver *drv,
 								  bool mapper_sphal)
 {
-	std::shared_ptr<GbmMesaDriver> gbm_mesa_drv;
+	if (!drv->priv)
+		drv->priv = new GbmMesaDriverPriv();
 
-	if (!drv->priv) {
-		gbm_mesa_drv = std::make_unique<GbmMesaDriver>();
+	auto *drv_priv = (GbmMesaDriverPriv *)drv->priv;
+	std::shared_ptr<GbmMesaDriver> &cached =
+	    mapper_sphal ? drv_priv->gbm_mesa_drv_mapper : drv_priv->gbm_mesa_drv_alloc;
+
+	if (!cached) {
+		std::shared_ptr<GbmMesaDriver> gbm_mesa_drv = std::make_unique<GbmMesaDriver>();
 
 		bool look_for_kms = is_separate_dc_gpu(&gbm_mesa_drv->gpu_node_fd);
 		gbm_mesa_drv->has_separate_gpu = look_for_kms;
@@ -393,14 +399,10 @@ static std::shared_ptr<GbmMesaDriver> gbm_mesa_get_or_init_driver(struct driver 
 
 		drv_logi("GBM Mesa driver initialized successfully\n");
 
-		auto priv = new GbmMesaDriverPriv();
-		priv->gbm_mesa_drv = gbm_mesa_drv;
-		drv->priv = priv;
-	} else {
-		gbm_mesa_drv = ((GbmMesaDriverPriv *)drv->priv)->gbm_mesa_drv;
+		cached = gbm_mesa_drv;
 	}
 
-	return gbm_mesa_drv;
+	return cached;
 }
 
 void gbm_mesa_driver_close(struct driver *drv)
