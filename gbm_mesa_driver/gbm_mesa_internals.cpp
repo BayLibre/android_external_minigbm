@@ -380,11 +380,13 @@ static std::shared_ptr<GbmMesaDriver> gbm_mesa_get_or_init_driver(struct driver 
 			return nullptr;
 		}
 
-		gbm_mesa_drv->gbm_dev =
-		    gbm_mesa_drv->wrapper->dev_create(gbm_mesa_drv->gbm_node_fd.Get());
+		// True only if gbm_node_fd was opened as the KMS-only node just above.
+		bool gbm_node_is_kms_only = look_for_kms && !mapper_sphal;
+		gbm_mesa_drv->gbm_dev = gbm_mesa_drv->wrapper->dev_create(
+		    gbm_mesa_drv->gbm_node_fd.Get(), gbm_node_is_kms_only);
 		if (!gbm_mesa_drv->gbm_dev) {
 			/* KMS-only node may have no Mesa driver; fall back to dumb buffers */
-			if (!look_for_kms || mapper_sphal) {
+			if (!gbm_node_is_kms_only) {
 				drv_loge("Unable to create gbm_mesa driver");
 				return nullptr;
 			}
@@ -394,8 +396,10 @@ static std::shared_ptr<GbmMesaDriver> gbm_mesa_get_or_init_driver(struct driver 
 
 		/* Create GPU device for fallback allocations when KMS (CMA) is exhausted */
 		if (gbm_mesa_drv->has_separate_gpu && gbm_mesa_drv->gpu_node_fd.Get() >= 0) {
+			/* This is always the actual GPU render node -- always zink. */
 			gbm_mesa_drv->gbm_gpu_dev =
-			    gbm_mesa_drv->wrapper->dev_create(gbm_mesa_drv->gpu_node_fd.Get());
+			    gbm_mesa_drv->wrapper->dev_create(gbm_mesa_drv->gpu_node_fd.Get(),
+							       /*is_kms_only=*/false);
 			if (gbm_mesa_drv->gbm_gpu_dev) {
 				drv_logi("GPU fallback device initialized (for non-scanout buffers)\n");
 			} else {
