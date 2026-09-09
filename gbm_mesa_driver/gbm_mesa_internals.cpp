@@ -446,8 +446,8 @@ static int gbm_mesa_alloc_dumb(struct bo *bo, uint32_t width, uint32_t height,
 	struct drm_mode_create_dumb create_arg = {};
 	int ret;
 
-	/* Calculate layout first */
-	drv_bo_from_format(bo, width, 1, height, format);
+	/* Calculate layout first (drv_bo_from_format expects a byte stride) */
+	drv_bo_from_format(bo, drv_stride_from_format(format, width, 0), 1, height, format);
 
 	/* Align for camera if needed */
 	if (use_flags & (BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE)) {
