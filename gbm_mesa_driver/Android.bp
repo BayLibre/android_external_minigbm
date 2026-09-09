@@ -4,7 +4,7 @@
 // you may not use this file except in compliance with the License.
 
 soong_namespace {
-    imports: ["device/spacemit/k1/mesa"],
+    imports: ["device/alibaba/a210/mesa"],
 }
 
 cc_library_shared {
