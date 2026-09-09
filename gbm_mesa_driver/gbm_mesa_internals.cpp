@@ -382,8 +382,13 @@ static std::shared_ptr<GbmMesaDriver> gbm_mesa_get_or_init_driver(struct driver 
 		gbm_mesa_drv->gbm_dev =
 		    gbm_mesa_drv->wrapper->dev_create(gbm_mesa_drv->gbm_node_fd.Get());
 		if (!gbm_mesa_drv->gbm_dev) {
-			drv_loge("Unable to create gbm_mesa driver");
-			return nullptr;
+			/* KMS-only node may have no Mesa driver; fall back to dumb buffers */
+			if (!look_for_kms || mapper_sphal) {
+				drv_loge("Unable to create gbm_mesa driver");
+				return nullptr;
+			}
+			drv_logi("No Mesa driver on KMS node; will use dumb-buffer allocation "
+				 "for scanout buffers\n");
 		}
 
 		/* Create GPU device for fallback allocations when KMS (CMA) is exhausted */
@@ -553,6 +558,18 @@ int gbm_mesa_bo_create(struct bo *bo, uint32_t width, uint32_t height, uint32_t 
 		alloc_args.use_scanout = true;
 		alloc_args.width = ALIGN(alloc_args.width, 32);
 		size_align = 4096;
+	}
+
+	/* No Mesa driver on this node: dumb buffer for scanout, GPU device otherwise */
+	if (drv->gbm_dev == nullptr) {
+		if (alloc_args.use_scanout)
+			return gbm_mesa_alloc_dumb(bo, width, height, format, use_flags, drv);
+
+		if (!drv->gbm_gpu_dev) {
+			drv_loge("No usable GBM device for non-scanout allocation");
+			return -ENODEV;
+		}
+		alloc_args.gbm = drv->gbm_gpu_dev;
 	}
 
 	err = wr->alloc(&alloc_args);
