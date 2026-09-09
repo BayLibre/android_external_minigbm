@@ -261,8 +261,9 @@ int open_drm_dev(bool card_node, std::function<bool(int, bool, std::string)> fou
  * For this GPUs we have to find and open /dev/cardX KMS node
  * Other GPUs can be accessed via renderD GPU node.
  */
-static std::array<std::string, 6> separate_dc_gpu_list = { "v3d",      "vc4",  "etnaviv",
-							   "panfrost", "lima", "freedreno" };
+static std::array<std::string, 7> separate_dc_gpu_list = { "v3d",  "vc4",     "etnaviv",
+							   "panfrost", "lima", "freedreno",
+							   "powervr" };
 
 static bool is_separate_dc_gpu(UniqueFd *out_gpu_fd)
 {
