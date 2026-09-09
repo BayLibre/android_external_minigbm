@@ -77,13 +77,8 @@ static uint32_t get_gbm_mesa_format(uint32_t drm_format)
 	return 0;
 }
 
-static void configure_mesa_environment(void)
+static void configure_mesa_environment(bool is_kms_only)
 {
-	static int configured = 0;
-	if (configured)
-		return;
-	configured = 1;
-
 	// Read GBM backends path from property
 	char backends_path[PROPERTY_VALUE_MAX];
 	property_get("vendor.mesa.gbm_backends_path", backends_path, "/vendor/lib64/gbm");
@@ -91,24 +86,26 @@ static void configure_mesa_environment(void)
 	// Configure Mesa GBM backend search path
 	setenv("GBM_BACKENDS_PATH", backends_path, 1);
 
-	// DRI drivers path (zink_dri.so, powervr_dri.so)
+	// DRI drivers path (zink_dri.so, powervr_dri.so, kmsro_dri.so)
 	setenv("LIBGL_DRIVERS_PATH", "/vendor/lib64/dri", 1);
 
-	// Force Zink as DRI driver for PowerVR (Vulkan-only GPU)
-	setenv("MESA_LOADER_DRIVER_OVERRIDE", "zink", 1);
+	// KMS-only nodes (vkms/dc8200) have no GPU behind them; zink can't
+	// attach there, so use kmsro instead. Not cached: re-evaluated per call.
+	const char *override = is_kms_only ? "kmsro" : "zink";
+	setenv("MESA_LOADER_DRIVER_OVERRIDE", override, 1);
 
-	ALOGI("GBM-MESA: backends=%s dri=/vendor/lib64/dri override=zink", backends_path);
+	ALOGI("GBM-MESA: backends=%s dri=/vendor/lib64/dri override=%s", backends_path, override);
 }
 
-static struct gbm_device *gbm_mesa_dev_create(int fd)
+static struct gbm_device *gbm_mesa_dev_create(int fd, bool is_kms_only)
 {
-	// Configure Mesa environment on first use
-	configure_mesa_environment();
+	configure_mesa_environment(is_kms_only);
 
 	struct gbm_device *gbm = gbm_create_device(fd);
 	if (!gbm) {
-		ALOGE("Unable to create gbm device (fd=%d)", fd);
-		ALOGE("Make sure dri_gbm.so is accessible in /vendor/lib64/gbm/");
+		ALOGE("Unable to create gbm device (fd=%d, kms_only=%d)", fd, is_kms_only);
+		ALOGE("Make sure %s_dri.so is accessible in /vendor/lib64/dri/",
+		      is_kms_only ? "kmsro" : "zink");
 	} else {
 		ALOGI("Successfully created GBM device");
 	}

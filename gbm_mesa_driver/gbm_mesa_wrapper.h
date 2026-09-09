@@ -38,7 +38,9 @@ struct alloc_args {
 struct gbm_ops {
 	uint32_t (*get_gbm_format)(uint32_t drm_format);
 
-	struct gbm_device *(*dev_create)(int fd);
+	// is_kms_only: use kmsro (not zink) for a display-only KMS node
+	// (vkms/dc8200) with no Vulkan-capable GPU of its own.
+	struct gbm_device *(*dev_create)(int fd, bool is_kms_only);
 
 	void (*dev_destroy)(struct gbm_device *gbm);
 
