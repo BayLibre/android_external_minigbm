@@ -192,6 +192,7 @@ struct GbmMesaDriver {
 	 */
 	UniqueFd dumb_node_fd;
 	bool has_separate_gpu = false;  /* true if GPU and KMS are separate devices */
+	bool use_dumb_scanout = false;
 };
 
 struct GbmMesaDriverPriv {
@@ -338,6 +339,13 @@ static std::shared_ptr<GbmMesaDriver> gbm_mesa_get_or_init_driver(struct driver 
 						return false;
 
 					gbm_mesa_drv->dumb_node_fd = UniqueFd(fd);
+					drmDevicePtr device;
+					if (!drmGetDevice2(fd, 0, &device)) {
+						gbm_mesa_drv->use_dumb_scanout =
+						    !(device->available_nodes &
+						      (1 << DRM_NODE_RENDER));
+						drmFreeDevice(&device);
+					}
 					drv_logi("Found KMS dev %s for dumb buffers\n",
 						 drm_name.c_str());
 					return true;
@@ -427,7 +435,7 @@ struct GbmMesaBoPriv {
 	bool use_dumb = false;  /* true if allocated via DRM dumb buffer */
 };
 
-/* Allocate a dumb buffer via DRM for formats not supported by GBM */
+/* Allocate through KMS for display constraints or formats unsupported by GBM. */
 static int gbm_mesa_alloc_dumb(struct bo *bo, uint32_t width, uint32_t height,
 			       uint32_t format, uint64_t use_flags,
 			       std::shared_ptr<GbmMesaDriver> gbm_drv)
@@ -444,25 +452,38 @@ static int gbm_mesa_alloc_dumb(struct bo *bo, uint32_t width, uint32_t height,
 	}
 
 	struct drm_mode_create_dumb create_arg = {};
+	bool rgb_scanout =
+	    gbm_drv->use_dumb_scanout && (use_flags & BO_USE_SCANOUT) && !is_yuv_format(format);
 	int ret;
 
-	/* Calculate layout first */
-	drv_bo_from_format(bo, width, 1, height, format);
+	if (rgb_scanout) {
+		create_arg.width = width;
+		create_arg.height = height;
+		create_arg.bpp = drv_stride_from_format(format, 1, 0) * 8;
+	} else {
+		/* Calculate layout first */
+		drv_bo_from_format(bo, width, 1, height, format);
 
-	/* Align for camera if needed */
-	if (use_flags & (BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE)) {
-		bo->meta.total_size = ALIGN(bo->meta.total_size, 4096);
+		/* Align for camera if needed */
+		if (use_flags & (BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE)) {
+			bo->meta.total_size = ALIGN(bo->meta.total_size, 4096);
+		}
+
+		/* Create dumb buffer - use total size as width with height=1 for simplicity */
+		create_arg.width = bo->meta.total_size;
+		create_arg.height = 1;
+		create_arg.bpp = 8;
 	}
-
-	/* Create dumb buffer - use total size as width with height=1 for simplicity */
-	create_arg.width = bo->meta.total_size;
-	create_arg.height = 1;
-	create_arg.bpp = 8;
 
 	ret = drmIoctl(fd, DRM_IOCTL_MODE_CREATE_DUMB, &create_arg);
 	if (ret) {
 		drv_loge("DRM_IOCTL_MODE_CREATE_DUMB failed: %s (fd=%d)", strerror(errno), fd);
 		return -errno;
+	}
+
+	if (rgb_scanout) {
+		drv_bo_from_format(bo, create_arg.pitch, 1, height, format);
+		bo->meta.total_size = create_arg.size;
 	}
 
 	/* Export as dma-buf */
@@ -523,6 +544,10 @@ int gbm_mesa_bo_create(struct bo *bo, uint32_t width, uint32_t height, uint32_t 
 			 format, (unsigned long long)use_flags);
 		return -EINVAL;
 	}
+
+	/* Allocate scanout on the display to honor its DMA and pitch constraints. */
+	if (drv->use_dumb_scanout && (use_flags & BO_USE_SCANOUT) && !is_yuv_format(format))
+		return gbm_mesa_alloc_dumb(bo, width, height, format, use_flags, drv);
 
 	/* For some ARM SOCs, if no more free CMA available, buffer can be allocated in VRAM but HWC
 	 * won't be able to display it directly, using GPU for compositing */
