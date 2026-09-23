@@ -430,6 +430,10 @@ struct GbmMesaBoPriv {
 
 	std::shared_ptr<GbmMesaDriver> drv;
 	uint32_t map_stride = 0;
+	/* fds[0] also serves as bo->handle: drv.c counts references and caches
+	 * mappings by handle, so every bo needs a key of its own or bo_destroy
+	 * never runs until the last bo of the process goes away.
+	 */
 	UniqueFd fds[DRV_MAX_PLANES];
 	struct gbm_bo *gbm_bo = nullptr;
 	bool use_dumb = false;  /* true if allocated via DRM dumb buffer */
@@ -511,6 +515,7 @@ static int gbm_mesa_alloc_dumb(struct bo *bo, uint32_t width, uint32_t height,
 	priv->use_dumb = true;
 	bo->meta.format_modifier = DRM_FORMAT_MOD_LINEAR;
 	bo->priv = priv;
+	bo->handle.fd = priv->fds[0].Get();
 
 	drv_logv("Allocated dumb buffer: %ux%u format=0x%x size=%zu",
 		 width, height, format, bo->meta.total_size);
@@ -627,7 +632,6 @@ int gbm_mesa_bo_create(struct bo *bo, uint32_t width, uint32_t height, uint32_t 
 		 alloc_args.out_stride, alloc_args.out_map_stride);
 
 	auto priv = new GbmMesaBoPriv();
-	// Note: inode tracking removed in newer minigbm versions
 	for (size_t plane = 0; plane < bo->meta.num_planes; plane++) {
 		priv->fds[plane] = UniqueFd(alloc_args.out_fd);
 	}
@@ -636,6 +640,7 @@ int gbm_mesa_bo_create(struct bo *bo, uint32_t width, uint32_t height, uint32_t 
 	bo->meta.format_modifier = alloc_args.out_modifier;
 
 	bo->priv = priv;
+	bo->handle.fd = priv->fds[0].Get();
 	priv->drv = drv;
 
 	return 0;
@@ -672,6 +677,7 @@ int gbm_mesa_bo_import(struct bo *bo, struct drv_import_fd_data *data)
 	}
 
 	bo->priv = priv;
+	bo->handle.fd = priv->fds[0].Get();
 
 	return 0;
 }
