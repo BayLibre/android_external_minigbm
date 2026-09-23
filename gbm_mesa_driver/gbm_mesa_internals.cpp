@@ -192,6 +192,7 @@ struct GbmMesaDriver {
 	 */
 	UniqueFd dumb_node_fd;
 	bool has_separate_gpu = false;  /* true if GPU and KMS are separate devices */
+	bool use_dumb_scanout = false;
 };
 
 struct GbmMesaDriverPriv {
@@ -338,6 +339,13 @@ static std::shared_ptr<GbmMesaDriver> gbm_mesa_get_or_init_driver(struct driver 
 						return false;
 
 					gbm_mesa_drv->dumb_node_fd = UniqueFd(fd);
+					drmDevicePtr device;
+					if (!drmGetDevice2(fd, 0, &device)) {
+						gbm_mesa_drv->use_dumb_scanout =
+						    !(device->available_nodes &
+						      (1 << DRM_NODE_RENDER));
+						drmFreeDevice(&device);
+					}
 					drv_logi("Found KMS dev %s for dumb buffers\n",
 						 drm_name.c_str());
 					return true;
@@ -422,12 +430,16 @@ struct GbmMesaBoPriv {
 
 	std::shared_ptr<GbmMesaDriver> drv;
 	uint32_t map_stride = 0;
+	/* fds[0] also serves as bo->handle: drv.c counts references and caches
+	 * mappings by handle, so every bo needs a key of its own or bo_destroy
+	 * never runs until the last bo of the process goes away.
+	 */
 	UniqueFd fds[DRV_MAX_PLANES];
 	struct gbm_bo *gbm_bo = nullptr;
 	bool use_dumb = false;  /* true if allocated via DRM dumb buffer */
 };
 
-/* Allocate a dumb buffer via DRM for formats not supported by GBM */
+/* Allocate through KMS for display constraints or formats unsupported by GBM. */
 static int gbm_mesa_alloc_dumb(struct bo *bo, uint32_t width, uint32_t height,
 			       uint32_t format, uint64_t use_flags,
 			       std::shared_ptr<GbmMesaDriver> gbm_drv)
@@ -444,25 +456,38 @@ static int gbm_mesa_alloc_dumb(struct bo *bo, uint32_t width, uint32_t height,
 	}
 
 	struct drm_mode_create_dumb create_arg = {};
+	bool rgb_scanout =
+	    gbm_drv->use_dumb_scanout && (use_flags & BO_USE_SCANOUT) && !is_yuv_format(format);
 	int ret;
 
-	/* Calculate layout first */
-	drv_bo_from_format(bo, width, 1, height, format);
+	if (rgb_scanout) {
+		create_arg.width = width;
+		create_arg.height = height;
+		create_arg.bpp = drv_stride_from_format(format, 1, 0) * 8;
+	} else {
+		/* Calculate layout first */
+		drv_bo_from_format(bo, width, 1, height, format);
 
-	/* Align for camera if needed */
-	if (use_flags & (BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE)) {
-		bo->meta.total_size = ALIGN(bo->meta.total_size, 4096);
+		/* Align for camera if needed */
+		if (use_flags & (BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE)) {
+			bo->meta.total_size = ALIGN(bo->meta.total_size, 4096);
+		}
+
+		/* Create dumb buffer - use total size as width with height=1 for simplicity */
+		create_arg.width = bo->meta.total_size;
+		create_arg.height = 1;
+		create_arg.bpp = 8;
 	}
-
-	/* Create dumb buffer - use total size as width with height=1 for simplicity */
-	create_arg.width = bo->meta.total_size;
-	create_arg.height = 1;
-	create_arg.bpp = 8;
 
 	ret = drmIoctl(fd, DRM_IOCTL_MODE_CREATE_DUMB, &create_arg);
 	if (ret) {
 		drv_loge("DRM_IOCTL_MODE_CREATE_DUMB failed: %s (fd=%d)", strerror(errno), fd);
 		return -errno;
+	}
+
+	if (rgb_scanout) {
+		drv_bo_from_format(bo, create_arg.pitch, 1, height, format);
+		bo->meta.total_size = create_arg.size;
 	}
 
 	/* Export as dma-buf */
@@ -490,6 +515,7 @@ static int gbm_mesa_alloc_dumb(struct bo *bo, uint32_t width, uint32_t height,
 	priv->use_dumb = true;
 	bo->meta.format_modifier = DRM_FORMAT_MOD_LINEAR;
 	bo->priv = priv;
+	bo->handle.fd = priv->fds[0].Get();
 
 	drv_logv("Allocated dumb buffer: %ux%u format=0x%x size=%zu",
 		 width, height, format, bo->meta.total_size);
@@ -523,6 +549,10 @@ int gbm_mesa_bo_create(struct bo *bo, uint32_t width, uint32_t height, uint32_t 
 			 format, (unsigned long long)use_flags);
 		return -EINVAL;
 	}
+
+	/* Allocate scanout on the display to honor its DMA and pitch constraints. */
+	if (drv->use_dumb_scanout && (use_flags & BO_USE_SCANOUT) && !is_yuv_format(format))
+		return gbm_mesa_alloc_dumb(bo, width, height, format, use_flags, drv);
 
 	/* For some ARM SOCs, if no more free CMA available, buffer can be allocated in VRAM but HWC
 	 * won't be able to display it directly, using GPU for compositing */
@@ -602,7 +632,6 @@ int gbm_mesa_bo_create(struct bo *bo, uint32_t width, uint32_t height, uint32_t 
 		 alloc_args.out_stride, alloc_args.out_map_stride);
 
 	auto priv = new GbmMesaBoPriv();
-	// Note: inode tracking removed in newer minigbm versions
 	for (size_t plane = 0; plane < bo->meta.num_planes; plane++) {
 		priv->fds[plane] = UniqueFd(alloc_args.out_fd);
 	}
@@ -611,6 +640,7 @@ int gbm_mesa_bo_create(struct bo *bo, uint32_t width, uint32_t height, uint32_t 
 	bo->meta.format_modifier = alloc_args.out_modifier;
 
 	bo->priv = priv;
+	bo->handle.fd = priv->fds[0].Get();
 	priv->drv = drv;
 
 	return 0;
@@ -647,6 +677,7 @@ int gbm_mesa_bo_import(struct bo *bo, struct drv_import_fd_data *data)
 	}
 
 	bo->priv = priv;
+	bo->handle.fd = priv->fds[0].Get();
 
 	return 0;
 }
