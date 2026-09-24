@@ -461,7 +461,12 @@ static int gbm_mesa_alloc_dumb(struct bo *bo, uint32_t width, uint32_t height,
 	int ret;
 
 	if (rgb_scanout) {
-		create_arg.width = width;
+		/* The GPU renders into this buffer too, with its own line stride
+		 * granularity: PowerVR writes lines in 2-pixel units, so the plain
+		 * pitch of an odd-width buffer shears every row. Pad the width so
+		 * the kernel's pitch suits the GPU as well as the display.
+		 */
+		create_arg.width = ALIGN(width, 16);
 		create_arg.height = height;
 		create_arg.bpp = drv_stride_from_format(format, 1, 0) * 8;
 	} else {
