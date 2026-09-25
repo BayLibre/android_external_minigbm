@@ -119,8 +119,11 @@ static struct format_metadata linear_metadata = { 1, 0, DRM_FORMAT_MOD_LINEAR };
 
 int gbm_mesa_driver_init(struct driver *drv)
 {
+	/* GPU_DATA_BUFFER is what a Vulkan storage image asks for, and the Android
+	 * loader offers storage usage on every swapchain. */
 	drv_add_combinations(drv, scanout_render_formats, ARRAY_SIZE(scanout_render_formats),
-			     &linear_metadata, BO_USE_RENDER_MASK | BO_USE_SCANOUT);
+			     &linear_metadata,
+			     BO_USE_RENDER_MASK | BO_USE_SCANOUT | BO_USE_GPU_DATA_BUFFER);
 
 	drv_add_combinations(drv, texture_only_formats, ARRAY_SIZE(texture_only_formats),
 			     &linear_metadata, BO_USE_TEXTURE_MASK | BO_USE_SCANOUT);
@@ -137,11 +140,12 @@ int gbm_mesa_driver_init(struct driver *drv)
 
 	/*
 	 * R8 format is used for Android's HAL_PIXEL_FORMAT_BLOB and is used for JPEG snapshots
-	 * from camera and input/output from hardware decoder/encoder.
+	 * from camera, input/output from hardware decoder/encoder, and the memory of Vulkan
+	 * buffers exported as AHardwareBuffers.
 	 */
 	drv_modify_combination(drv, DRM_FORMAT_R8, &linear_metadata,
 			       BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE | BO_USE_HW_VIDEO_DECODER |
-				   BO_USE_HW_VIDEO_ENCODER);
+				   BO_USE_HW_VIDEO_ENCODER | BO_USE_GPU_DATA_BUFFER);
 
 	/*
 	 * Android also frequently requests YV12 formats for some camera implementations
